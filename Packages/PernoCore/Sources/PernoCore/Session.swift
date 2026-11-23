@@ -431,3 +431,59 @@ extension SessionMachine {
         order = Array(order[...position]) + tail
     }
 }
+
+// MARK: - Ripresa dopo un'interruzione
+
+extension CompletedSet {
+    public init(exerciseIndex: Int, setIndex: Int, kind: SetKind, weight: Double, reps: Int,
+                startedAt: Date, endedAt: Date) {
+        self.exerciseIndex = exerciseIndex
+        self.setIndex = setIndex
+        self.kind = kind
+        self.weight = weight
+        self.reps = reps
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+    }
+}
+
+extension SessionMachine {
+    /// Ripresa: riparte dal set dopo l'ultimo «Set fatto». Se l'esercizio ha ancora set, il recupero
+    /// riparte da adesso; altrimenti cambio esercizio (da adesso) sul primo esercizio dopo con set
+    /// da fare. Il riscaldamento non si ripete.
+    public init(resuming exercises: [PlannedExercise], completed: [CompletedSet], pauses: [Pause], at now: Date) {
+        self.init(exercises: exercises, warmUp: false, at: now)
+        let sorted = completed.sorted { $0.endedAt < $1.endedAt }
+        completedSets = sorted
+        self.pauses = pauses
+        guard !exercises.isEmpty else { return }
+
+        func undone(_ exercise: Int) -> [Int] {
+            exercises[exercise].sets.indices.filter { index in
+                !sorted.contains { $0.exerciseIndex == exercise && $0.setIndex == index }
+            }
+        }
+
+        var start = 0
+        if let last = sorted.last, let lastPosition = order.firstIndex(of: last.exerciseIndex) {
+            if let next = undone(last.exerciseIndex).first(where: { $0 > last.setIndex }) {
+                position = lastPosition
+                setIndex = next
+                phase = .rest(since: now)
+                return
+            }
+            start = lastPosition + 1
+        }
+        for candidate in start..<order.count {
+            if let first = undone(order[candidate]).first {
+                position = candidate
+                setIndex = first
+                phase = .changeover(since: now)
+                return
+            }
+        }
+        position = order.count
+        setIndex = 0
+        phase = .finished
+    }
+}

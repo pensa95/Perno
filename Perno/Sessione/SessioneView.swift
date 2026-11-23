@@ -7,6 +7,9 @@ import PernoCore
 /// Senza audio, vibrazione, notifiche e timer in background (dopo le prove tecniche sul telefono).
 struct SessioneView: View {
     let sessione: SessioneInCorso
+    /// Freccia giù: la schermata si chiude, la sessione continua (barra ridotta e card in Home).
+    let riduci: () -> Void
+    /// Sessione chiusa.
     let chiudi: () -> Void
 
     @State private var chiediConclusione = false
@@ -98,9 +101,7 @@ struct SessioneView: View {
 
     private func testata(ora: Date) -> some View {
         HStack(spacing: 4) {
-            PulsanteTondo(icona: "chevron.down", etichetta: "Riduci la sessione") {
-                // Barra della sessione ridotta: con la ripresa (settimana 3).
-            }
+            PulsanteTondo(icona: "chevron.down", etichetta: "Riduci la sessione", azione: riduci)
             VStack(spacing: 0) {
                 Text(sessione.sessione.routineName)
                     .font(.footnote.weight(.medium))
