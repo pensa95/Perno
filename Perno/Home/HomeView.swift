@@ -6,15 +6,20 @@ import PernoCore
 /// Calendario della settimana, «Oggi, giovedì» con la card della scheda di oggi, «Oppure» con le altre
 /// schede e la sessione libera; a sessione fatta, numeri e «Prossimo allenamento».
 struct HomeView: View {
+    /// Sessione aperta in questo momento (anche ridotta).
+    var sessioneViva: SessioneInCorso? = nil
     /// Apre la sezione Storico («Vedi nello storico»).
     var apriStorico: () -> Void = {}
+    var avvia: (Routine) -> Void = { _ in }
+    var riprendi: (WorkoutSession) -> Void = { _ in }
+    /// Riapre la schermata della sessione ridotta.
+    var apriSessione: () -> Void = {}
 
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
     @Query private var giorni: [PlanDay]
     @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
 
     @Environment(\.modelContext) private var context
-    @State private var sessioneAperta: SessioneInCorso?
     @State private var sessioneDaAnnullare: WorkoutSession?
 
     private var calendario: Calendar { .current }
@@ -96,7 +101,16 @@ struct HomeView: View {
                 CalendarioSettimana(giorni: giorniCalendario)
                     .padding(.top, 28)
 
-                if let sessione = sessioneDiOggi {
+                if let viva = sessioneViva {
+                    sezione("Sessione in corso", sopra: 32) { cardInCorso(viva) }
+                } else if let interrotta = sessioneInterrotta {
+                    sezione("Sessione interrotta", sopra: 32) { cardInterrotta(interrotta) }
+                    Text(ResumeText.footnote)
+                        .font(.footnote)
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .padding(.horizontal, 4)
+                        .padding(.top, 20)
+                } else if let sessione = sessioneDiOggi {
                     sezione(titoloOggi, sopra: 32) { cardFatto(sessione) }
                     if let prossimo = prossimoAllenamento {
                         sezione("Prossimo allenamento", sopra: 28) {
@@ -126,16 +140,6 @@ struct HomeView: View {
         } message: { _ in
             Text("La sessione viene eliminata con tutti i set e oggi torna da fare.")
         }
-        .fullScreenCover(item: $sessioneAperta) { sessione in
-            SessioneView(sessione: sessione) { sessioneAperta = nil }
-        }
-    }
-
-    /// «Inizia …»: crea il registro dalla scheda e apre la schermata della sessione.
-    private func avvia(_ scheda: Routine) {
-        guard !scheda.entries.isEmpty else { return }
-        let sessione = WorkoutSession.avvia(da: scheda, in: context)
-        sessioneAperta = SessioneInCorso(sessione: sessione, context: context)
     }
 
     /// «Annulla sessione» sulla card di oggi fatto: elimina la sessione (set e pause compresi).
@@ -159,6 +163,119 @@ struct HomeView: View {
     }
 
     // MARK: Card
+
+    /// Sessione rimasta aperta (app chiusa durante la sessione).
+    private var sessioneInterrotta: WorkoutSession? {
+        sessioni.last { $0.endedAt == nil }
+    }
+
+    private func avanzamento(_ sessione: WorkoutSession) -> [ExerciseProgress] {
+        sessione.orderedExercises.map { esercizio in
+            let lavoro = esercizio.orderedSets.filter { $0.kind != .approach }
+            return ExerciseProgress(name: esercizio.name, done: lavoro.filter(\.isDone).count, total: lavoro.count)
+        }
+    }
+
+    /// Una barretta per esercizio: piena = fatto, attenuata = iniziato, solo bordo = da fare.
+    private func barrette(_ esercizi: [ExerciseProgress]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(esercizi.enumerated()), id: \.offset) { _, esercizio in
+                Group {
+                    switch esercizio.state {
+                    case .done:
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.piastra)
+                    case .started:
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.piastra.opacity(0.55))
+                    case .notStarted:
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.inchiostro.opacity(0.22), lineWidth: 1.5)
+                    }
+                }
+                .frame(height: 36)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// Card «Sessione interrotta»: «Riprendi sessione» e «Chiudi e vai al riepilogo».
+    private func cardInterrotta(_ sessione: WorkoutSession) -> some View {
+        let esercizi = avanzamento(sessione)
+        return VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(sessione.titolo)
+                    .font(.piastra(48))
+                    .foregroundStyle(Color.inchiostro)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                Text(ResumeText.interrupted(at: sessione.lastActivityAt, done: sessione.setFatti,
+                                            total: sessione.setPrevisti))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.inchiostroTenue)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                barrette(esercizi)
+                Text(ResumeText.summary(esercizi))
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.inchiostroTenue)
+            }
+            PulsanteGiallo(titolo: "Riprendi sessione") { riprendi(sessione) }
+            Button {
+                chiudiInterrotta(sessione)
+            } label: {
+                Text("Chiudi e vai al riepilogo")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.inchiostro)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, -8)
+        }
+        .padding(.top, 20)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    /// Card della sessione ridotta: torna alla schermata della sessione.
+    private func cardInCorso(_ viva: SessioneInCorso) -> some View {
+        let esercizi = avanzamento(viva.sessione)
+        let conto = viva.setDiLavoroTotali
+        return VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(viva.sessione.titolo)
+                    .font(.piastra(48))
+                    .foregroundStyle(Color.inchiostro)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                Text(ResumeText.inProgress(done: conto.fatti, total: conto.totale))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.inchiostroTenue)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                barrette(esercizi)
+                Text(ResumeText.summary(esercizi))
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.inchiostroTenue)
+            }
+            PulsanteGiallo(titolo: "Torna alla sessione", azione: apriSessione)
+        }
+        .padding(.top, 20)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    /// «Chiudi e vai al riepilogo»: il riepilogo arriva nella settimana 4; per ora la sessione si
+    /// chiude all'ultimo «Set fatto» e va nello storico.
+    private func chiudiInterrotta(_ sessione: WorkoutSession) {
+        let ultimo = sessione.exercises.flatMap(\.sets).compactMap(\.endedAt).max()
+        sessione.endedAt = ultimo ?? sessione.lastActivityAt
+        sessione.isSaved = true
+        try? context.save()
+    }
 
     private func cardDaFare(_ scheda: Routine) -> some View {
         VStack(alignment: .leading, spacing: 20) {

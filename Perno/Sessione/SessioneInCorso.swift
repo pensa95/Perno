@@ -47,7 +47,10 @@ final class SessioneInCorso: Identifiable {
 
     let id: UUID
 
-    init(sessione: WorkoutSession, riscaldamento: Bool = true, context: ModelContext) {
+    /// `riprendi`: sessione interrotta (app chiusa) che riparte dal set dopo l'ultimo «Set fatto»,
+    /// con il recupero ricalcolato da adesso.
+    init(sessione: WorkoutSession, riscaldamento: Bool = true, riprendi: Bool = false,
+         alle ora: Date = .now, context: ModelContext) {
         self.sessione = sessione
         self.id = sessione.id
         self.context = context
@@ -61,9 +64,32 @@ final class SessioneInCorso: Identifiable {
                 PlannedSet(kind: $0.kind, weight: $0.targetWeight, reps: $0.targetReps)
             })
         }
-        self.macchina = SessionMachine(exercises: piano, warmUp: riscaldamento, at: sessione.startedAt)
+        if riprendi {
+            var fatti: [CompletedSet] = []
+            for (esercizio, sets) in set.enumerated() {
+                for (indice, registrato) in sets.enumerated() {
+                    guard let fine = registrato.endedAt, let peso = registrato.weight,
+                          let ripetizioni = registrato.reps else { continue }
+                    fatti.append(CompletedSet(exerciseIndex: esercizio, setIndex: indice, kind: registrato.kind,
+                                              weight: peso, reps: ripetizioni,
+                                              startedAt: registrato.startedAt ?? fine, endedAt: fine))
+                }
+            }
+            let pause = sessione.orderedPauses.map { pausa in
+                Pause(kind: pausa.kind,
+                      exerciseIndex: esercizi.firstIndex { $0 === pausa.sessionExercise },
+                      afterApproach: pausa.afterApproach, start: pausa.start, end: pausa.end)
+            }
+            self.macchina = SessionMachine(resuming: piano, completed: fatti, pauses: pause, at: ora)
+            sessione.lastActivityAt = ora
+        } else {
+            self.macchina = SessionMachine(exercises: piano, warmUp: riscaldamento, at: sessione.startedAt)
+        }
         self.modoRecupero = UserDefaults.standard.string(forKey: Self.chiaveModoRecupero)
             .flatMap(RestMode.init(rawValue:)) ?? .stopwatch
+        // Quello che è già nel registro non va riscritto.
+        setScritti = macchina.completedSets.count
+        pauseScritte = macchina.pauses.count
         aggiornaRecuperoAbituale()
     }
 
@@ -317,6 +343,14 @@ final class SessioneInCorso: Identifiable {
 
     /// «Concludi», o fine dell'ultimo set (quando si chiude il suo avviso). Il riepilogo arriva nella settimana 4: per ora la
     /// sessione si chiude e va nello storico così com'è.
+    /// Set di lavoro fatti e previsti in tutta la sessione.
+    var setDiLavoroTotali: (fatti: Int, totale: Int) {
+        esercizi.indices.reduce((0, 0)) { somma, indice in
+            let conto = setDiLavoro(di: indice)
+            return (somma.0 + conto.fatti, somma.1 + conto.totale)
+        }
+    }
+
     func concludi(alle ora: Date = .now) {
         macchina.finish()
         avviso = nil
