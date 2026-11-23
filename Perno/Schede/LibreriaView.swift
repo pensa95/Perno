@@ -8,12 +8,15 @@ import PernoCore
 struct LibreriaView: View {
     /// Nome della sezione a cui torna la freccia in testata.
     var indietro = "Schede"
+    /// Se impostato, la libreria serve a scegliere: il tocco su un esercizio lo passa qui e torna indietro.
+    var scegli: ((Exercise) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Query private var esercizi: [Exercise]
     @State private var ricerca = ""
     @State private var filtro: MuscleGroup?
     @State private var nuovoAperto = false
+    @State private var appenaCreato: Exercise?
 
     private struct Sezione: Identifiable {
         let gruppo: MuscleGroup
@@ -53,7 +56,18 @@ struct LibreriaView: View {
                             EtichettaSezione(sezione.gruppo.label)
                             Pila {
                                 ForEach(sezione.esercizi) { esercizio in
-                                    VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                    if let scegli {
+                                        Button {
+                                            scegli(esercizio)
+                                            dismiss()
+                                        } label: {
+                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        // Il tocco aprirà il dettaglio esercizio (settimane 5–6).
+                                        VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                    }
                                 }
                             }
                         }
@@ -75,8 +89,8 @@ struct LibreriaView: View {
         .scrollDismissesKeyboard(.immediately)
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $nuovoAperto) {
-            NuovoEsercizioView(gruppoIniziale: filtro ?? .chest)
+        .sheet(isPresented: $nuovoAperto, onDismiss: sceltoDopoCreazione) {
+            NuovoEsercizioView(gruppoIniziale: filtro ?? .chest) { appenaCreato = $0 }
         }
     }
 
@@ -106,6 +120,14 @@ struct LibreriaView: View {
             }
         }
         .accessibilityLabel("Gruppo muscolare")
+    }
+
+    /// In modalità scelta, l'esercizio appena creato si aggiunge subito.
+    private func sceltoDopoCreazione() {
+        guard let esercizio = appenaCreato, let scegli else { return }
+        appenaCreato = nil
+        scegli(esercizio)
+        dismiss()
     }
 
     private func sottotitolo(_ esercizio: Exercise) -> String {

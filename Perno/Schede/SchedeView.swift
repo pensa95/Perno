@@ -10,6 +10,8 @@ struct SchedeView: View {
     @Query private var giorni: [PlanDay]
     @Query private var esercizi: [Exercise]
     @State private var giornoAperto: GiornoScelto?
+    @State private var nuovaScheda: Routine?
+    @Environment(\.modelContext) private var context
 
     private struct GiornoScelto: Identifiable {
         let weekday: Int
@@ -54,16 +56,19 @@ struct SchedeView: View {
                 if !schede.isEmpty {
                     Pila {
                         ForEach(schede) { scheda in
-                            // Il tocco aprirà l'editor della scheda (prossimo task).
-                            VocePila(titolo: scheda.name, sottotitolo: scheda.riassunto)
+                            NavigationLink {
+                                EditorSchedaView(scheda: scheda)
+                            } label: {
+                                VocePila(titolo: scheda.name.isEmpty ? "Senza nome" : scheda.name,
+                                         sottotitolo: scheda.riassunto)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.top, 12)
                 }
 
-                PulsanteGiallo(titolo: "Nuova scheda", icona: "plus") {
-                    // Prossimo task: crea la scheda e apre l'editor.
-                }
+                PulsanteGiallo(titolo: "Nuova scheda", icona: "plus", azione: creaScheda)
                 .padding(.top, 12)
 
                 Pila {
@@ -85,6 +90,17 @@ struct SchedeView: View {
         .sheet(item: $giornoAperto) { giorno in
             PianoGiornoView(weekday: giorno.weekday)
         }
+        .navigationDestination(item: $nuovaScheda) { scheda in
+            EditorSchedaView(scheda: scheda)
+        }
+    }
+
+    /// Crea una scheda vuota e apre l'editor.
+    private func creaScheda() {
+        let scheda = Routine(name: RoutineNames.new(existing: schede.map(\.name)))
+        context.insert(scheda)
+        try? context.save()
+        nuovaScheda = scheda
     }
 
     private var conteggioEsercizi: String {

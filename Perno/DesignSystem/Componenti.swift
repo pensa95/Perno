@@ -242,6 +242,7 @@ struct SelettoreGriglia<Valore: Hashable>: View {
 /// Foglio standard: maniglia, titolo, X (chiude senza salvare), contenuto, pulsante giallo in fondo.
 struct Foglio<Content: View>: View {
     let titolo: String
+    var sottotitolo: String? = nil
     let pulsante: String
     var pulsanteAttivo = true
     let chiudi: () -> Void
@@ -250,10 +251,17 @@ struct Foglio<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            HStack {
-                Text(titolo)
-                    .font(.piastra(32))
-                    .foregroundStyle(Color.inchiostro)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(titolo)
+                        .font(.piastra(32))
+                        .foregroundStyle(Color.inchiostro)
+                    if let sottotitolo {
+                        Text(sottotitolo)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Color.inchiostroTenue)
+                    }
+                }
                 Spacer()
                 PulsanteTondo(icona: "xmark", etichetta: "Chiudi", azione: chiudi)
             }
@@ -278,5 +286,87 @@ extension View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
             .presentationBackground(Color.lamiera)
+    }
+}
+
+// MARK: - Stepper
+
+/// Stepper −/+ su fondo lamiera, raggio 12, numero in Barlow Condensed 26.
+/// `riempi` allarga il controllo a tutto lo spazio (ripetizioni «da» e «a»).
+struct StepperPiastra: View {
+    let valore: String
+    var riempi = false
+    let menoAttivo: Bool
+    let piuAttivo: Bool
+    let etichettaMeno: String
+    let etichettaPiu: String
+    let meno: () -> Void
+    let piu: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            tasto("minus", attivo: menoAttivo, etichetta: etichettaMeno, azione: meno)
+            Text(valore)
+                .font(.piastra(26))
+                .monospacedDigit()
+                .foregroundStyle(Color.inchiostro)
+                .frame(minWidth: 36)
+                .frame(maxWidth: riempi ? .infinity : nil)
+                .contentTransition(.numericText())
+            tasto("plus", attivo: piuAttivo, etichetta: etichettaPiu, azione: piu)
+        }
+        .frame(maxWidth: riempi ? .infinity : nil)
+        .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func tasto(_ icona: String, attivo: Bool, etichetta: String, azione: @escaping () -> Void) -> some View {
+        Button(action: azione) {
+            Image(systemName: icona)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.inchiostro)
+                .frame(width: riempi ? 40 : 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!attivo)
+        .opacity(attivo ? 1 : 0.3)
+        .accessibilityLabel(etichetta)
+    }
+}
+
+// MARK: - Segmenti
+
+/// Selettore a segmenti: fondo piastra fatta, voce scelta su foglio con ombra leggera.
+struct SelettoreSegmenti<Valore: Hashable>: View {
+    let valori: [Valore]
+    @Binding var selezione: Valore
+    let etichetta: (Valore) -> String
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(valori, id: \.self) { valore in
+                let scelto = valore == selezione
+                Button {
+                    selezione = valore
+                } label: {
+                    Text(etichetta(valore))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background {
+                            if scelto {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.foglio)
+                                    .shadow(color: Color.inchiostro.opacity(0.12), radius: 1.5, y: 1)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(scelto ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
