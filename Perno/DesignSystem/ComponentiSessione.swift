@@ -141,6 +141,17 @@ struct DockSessione: View {
     var secondario: Secondario? = nil
     var principale: Pulsante? = nil
     var bordoSopra = false
+    /// Tocco sul tempo (recupero: cronometro ↔ conto alla rovescia), con l'icona accanto.
+    var azioneTempo: (() -> Void)? = nil
+
+    private var testoTempo: some View {
+        Text(tempo)
+            .font(.piastra(64))
+            .monospacedDigit()
+            .foregroundStyle(coloreTesto)
+            .frame(height: 56)
+            .lineLimit(1)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -150,12 +161,20 @@ struct DockSessione: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(coloreEtichetta)
                         .lineLimit(1)
-                    Text(tempo)
-                        .font(.piastra(64))
-                        .monospacedDigit()
-                        .foregroundStyle(coloreTesto)
-                        .frame(height: 56)
-                        .lineLimit(1)
+                    if let azioneTempo {
+                        Button(action: azioneTempo) {
+                            HStack(spacing: 8) {
+                                testoTempo
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(coloreTesto.opacity(0.8))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Passa tra cronometro e conto alla rovescia")
+                    } else {
+                        testoTempo
+                    }
                 }
                 Spacer(minLength: 0)
                 if let secondario {
