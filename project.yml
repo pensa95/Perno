@@ -32,6 +32,9 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
+        UIAppFonts:
+          - BarlowCondensed-Medium.ttf
+          - BarlowCondensed-SemiBold.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pensa95.perno

@@ -52,6 +52,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build
 
+      - name: Verifica i font nell'app
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Perno.app
+          for f in BarlowCondensed-Medium.ttf BarlowCondensed-SemiBold.ttf; do
+            test -f "$APP/$f" || { echo "Manca $f nel bundle"; exit 1; }
+          done
+          plutil -extract UIAppFonts json -o - "$APP/Info.plist"
+
       - name: Crea Perno.ipa
         run: |
           mkdir -p Payload
