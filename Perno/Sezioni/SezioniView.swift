@@ -30,7 +30,7 @@ struct SezioniView: View {
         ZStack(alignment: .bottom) {
             switch sezione {
             case .allenati:
-                NavigationStack { InArrivoView(titolo: "Allenati") }
+                NavigationStack { HomeView(apriStorico: { sezione = .storico }) }
             case .schede:
                 NavigationStack { SchedeView() }
             case .storico:
@@ -87,7 +87,7 @@ struct BarraSezioni: View {
     }
 }
 
-/// Sezione non ancora costruita (Allenati arriva con la Home, Storico con le settimane 5–6).
+/// Sezione non ancora costruita (Storico arriva con le settimane 5–6).
 struct InArrivoView: View {
     let titolo: String
 
