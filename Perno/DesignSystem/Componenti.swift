@@ -1,4 +1,5 @@
 import SwiftUI
+import PernoCore
 
 // Componenti propri della UI v3, da riusare ovunque (niente stili fuori da qui e da Theme).
 
@@ -368,5 +369,113 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
         }
         .padding(2)
         .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+// MARK: - Pulsante secondario
+
+/// Pulsante secondario: fondo lamiera, bordo leggero, raggio 12 («Vedi nello storico», «Inizia» nelle voci).
+struct PulsanteSecondario: View {
+    let titolo: String
+    var altezza: CGFloat = 52
+    var riempi = true
+    let azione: () -> Void
+
+    var body: some View {
+        Button(action: azione) {
+            Text(titolo)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.inchiostro)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: riempi ? .infinity : nil, minHeight: altezza)
+                .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.inchiostro.opacity(0.1), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Calendario della settimana
+
+/// Calendario della settimana: spunta = fatto, bordo pieno = saltato, tratteggio = in programma
+/// (oggi con fondo bianco), puntino = riposo (la linea si interrompe), capsula scura sulla lettera = oggi.
+struct CalendarioSettimana: View {
+    let giorni: [CalendarDay]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(giorni, id: \.weekday) { giorno in
+                VStack(spacing: 6) {
+                    Text(WeekCalendar.letter(giorno.weekday))
+                        .font(.system(size: 13, weight: giorno.isToday ? .semibold : .medium))
+                        .foregroundStyle(giorno.isToday ? Color.foglio : Color.inchiostroTenue)
+                        .frame(minWidth: 26, minHeight: 24)
+                        .padding(.horizontal, 4)
+                        .background(giorno.isToday ? Color.inchiostro : Color.clear, in: Capsule())
+                    casella(giorno)
+                        .frame(width: 36, height: 36)
+                    Text(giorno.label)
+                        .font(.system(size: 12, weight: giorno.isToday ? .semibold : .medium))
+                        .foregroundStyle(giorno.isToday ? Color.inchiostro : Color.inchiostroTenue)
+                        .lineLimit(1)
+                        .frame(height: 16)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(descrizione(giorno))
+            }
+        }
+        .background(alignment: .top) {
+            // Linea che unisce i giorni, all'altezza del centro delle caselle (24 + 6 + 18).
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.linea)
+                    .frame(width: geo.size.width * 0.86, height: 1)
+                    .position(x: geo.size.width / 2, y: 48)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func casella(_ giorno: CalendarDay) -> some View {
+        let forma = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        switch giorno.status {
+        case .done:
+            forma.fill(Color.piastra)
+                .overlay {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.piastraTesto)
+                }
+        case .skipped:
+            forma.fill(Color.lamiera)
+                .overlay { forma.strokeBorder(Color.piastra, lineWidth: 2) }
+        case .planned:
+            forma.fill(giorno.isToday ? Color.foglio : Color.lamiera)
+                .overlay {
+                    forma.strokeBorder(giorno.isToday ? Color.piastra : Color.piastraTenue,
+                                       style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                }
+        case .rest:
+            ZStack {
+                Rectangle().fill(Color.lamiera).frame(width: 18, height: 12)
+                Circle().fill(Color.piastraTenue).frame(width: 4, height: 4)
+            }
+        }
+    }
+
+    private func descrizione(_ giorno: CalendarDay) -> String {
+        let stato: String
+        switch giorno.status {
+        case .done: stato = "fatto"
+        case .skipped: stato = "saltato"
+        case .planned: stato = giorno.isToday ? "oggi, da fare" : "in programma"
+        case .rest: stato = "riposo"
+        }
+        let nome = giorno.label.isEmpty ? "" : "\(giorno.label), "
+        return "\(Weekday.name(giorno.weekday)): \(nome)\(stato)"
     }
 }
