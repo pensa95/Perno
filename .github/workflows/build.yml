@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-linux:
+    name: Test PernoCore (Linux)
+    runs-on: ubuntu-latest
+    container: swift:5.10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test --package-path Packages/PernoCore
+
+  build-ios:
+    name: Build .ipa (iOS)
+    runs-on: macos-15
+    needs: test-linux
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode in uso
+        run: xcodebuild -version
+
+      - name: XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build non firmata
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Perno.xcodeproj \
+            -scheme Perno \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Crea Perno.ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Perno.app Payload/
+          zip -qry Perno.ipa Payload
+          ls -lh Perno.ipa
+
+      - name: Allega alla run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Perno-${{ github.run_number }}
+          path: Perno.ipa
+
+      - name: Pubblica la release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Perno build ${{ github.run_number }}
+          prerelease: true
+          body: |
+            Build automatica di `${{ github.sha }}`.
+            Sul telefono: scarica Perno.ipa e aprilo con SideStore.
+          files: Perno.ipa
