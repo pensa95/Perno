@@ -91,3 +91,10 @@ public enum SessionText {
         min(total, max(1, total - Int(floor(max(0, elapsed)))))
     }
 }
+
+extension SessionText {
+    /// Avviso dopo «Set fatto»: «Set 1, 62,5 ×» (le ripetizioni sono nel −/+ accanto).
+    public static func noticeTitle(_ kind: SetKind, _ number: Int, weight: Double) -> String {
+        "\(shortName(kind, number)), \(Weights.format(weight)) ×"
+    }
+}
