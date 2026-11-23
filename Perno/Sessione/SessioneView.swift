@@ -335,9 +335,14 @@ struct SessioneView: View {
         case let .rest(dal):
             DockSessione(
                 sfondo: .recupero, coloreEtichetta: .recuperoTenue, coloreTesto: .white,
-                etichetta: SessionText.restLabel(usual: sessione.recuperoAbituale),
-                tempo: SessionText.clock(ora.timeIntervalSince(dal)),
-                principale: pulsanteInizia)
+                etichetta: sessione.etichettaRecupero,
+                tempo: RestTimer.display(mode: sessione.modoRecupero, elapsed: ora.timeIntervalSince(dal),
+                                         duration: sessione.durataRecupero),
+                secondario: sessione.modoRecupero == .countdown
+                    ? DockSessione.Secondario(titolo: "+15 s", azione: { sessione.aggiungiQuindiciSecondi() })
+                    : nil,
+                principale: pulsanteInizia,
+                azioneTempo: { sessione.cambiaModoRecupero() })
         case .finished:
             EmptyView()
         }

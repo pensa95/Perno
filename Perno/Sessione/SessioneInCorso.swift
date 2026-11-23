@@ -25,6 +25,14 @@ final class SessioneInCorso: Identifiable {
     /// Secondi in cui l'avviso resta aperto; ogni tocco li rinnova.
     static let durataAvviso: TimeInterval = 5
 
+    /// Recupero in cronometro o alla rovescia: l'ultima scelta resta (anche tra le sessioni).
+    var modoRecupero: RestMode {
+        didSet { UserDefaults.standard.set(modoRecupero.rawValue, forKey: Self.chiaveModoRecupero) }
+    }
+    private static let chiaveModoRecupero = "recupero.modo"
+    /// Secondi aggiunti con «+15 s» al recupero che inizia in `inizio`.
+    private var aggiunta: (inizio: Date, secondi: TimeInterval)? = nil
+
     struct Avviso: Equatable {
         let esercizio: Int
         let set: Int
@@ -52,6 +60,8 @@ final class SessioneInCorso: Identifiable {
             })
         }
         self.macchina = SessionMachine(exercises: piano, warmUp: riscaldamento, at: sessione.startedAt)
+        self.modoRecupero = UserDefaults.standard.string(forKey: Self.chiaveModoRecupero)
+            .flatMap(RestMode.init(rawValue:)) ?? .stopwatch
         aggiornaRecuperoAbituale()
     }
 
@@ -116,6 +126,31 @@ final class SessioneInCorso: Identifiable {
             avviso = Avviso(esercizio: fatto.exerciseIndex, set: fatto.setIndex,
                             scadenza: ora.addingTimeInterval(Self.durataAvviso))
         }
+    }
+
+    // MARK: Recupero
+
+    /// Durata del conto alla rovescia del recupero in corso (fissato, abituale o 2:00, più i «+15 s»).
+    var durataRecupero: TimeInterval {
+        let base = RestTimer.duration(fixed: esercizioCorrente?.fixedRest, usual: recuperoAbituale)
+        guard case let .rest(dal) = fase, let aggiunta, aggiunta.inizio == dal else { return base }
+        return base + aggiunta.secondi
+    }
+
+    var etichettaRecupero: String {
+        RestTimer.label(fixed: esercizioCorrente?.fixedRest, usual: recuperoAbituale)
+    }
+
+    /// Tocco sul tempo: cronometro ↔ conto alla rovescia.
+    func cambiaModoRecupero() {
+        modoRecupero = modoRecupero.toggled
+    }
+
+    /// «+15 s» (solo nel conto alla rovescia): allunga il recupero in corso.
+    func aggiungiQuindiciSecondi() {
+        guard case let .rest(dal) = fase else { return }
+        let gia = aggiunta?.inizio == dal ? (aggiunta?.secondi ?? 0) : 0
+        aggiunta = (dal, gia + RestTimer.extraStep)
     }
 
     // MARK: Correggi set
