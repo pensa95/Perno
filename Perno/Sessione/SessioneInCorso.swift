@@ -9,11 +9,11 @@ import PernoCore
 final class SessioneInCorso: Identifiable {
     let sessione: WorkoutSession
     /// Esercizi nell'ordine della scheda (gli indici della macchina puntano qui).
-    let esercizi: [SessionExercise]
+    private(set) var esercizi: [SessionExercise]
     /// Set di ogni esercizio, avvicinamenti prima (stessi indici della macchina).
-    let set: [[SessionSet]]
+    private(set) var set: [[SessionSet]]
     /// Set di lavoro dell'ultima volta, per «prima 60 × 12».
-    let prima: [[(weight: Double, reps: Int)]]
+    private(set) var prima: [[(weight: Double, reps: Int)]]
     /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, che arrivano nella settimana 4).
     let secondiContoAllaRovescia = 3
 
@@ -80,8 +80,11 @@ final class SessioneInCorso: Identifiable {
                       exerciseIndex: esercizi.firstIndex { $0 === pausa.sessionExercise },
                       afterApproach: pausa.afterApproach, start: pausa.start, end: pausa.end)
             }
-            self.macchina = SessionMachine(resuming: piano, completed: fatti, pauses: pause, at: ora)
+            self.macchina = SessionMachine(resuming: piano, completed: fatti, pauses: pause,
+                                           openEnded: sessione.isFree, at: ora)
             sessione.lastActivityAt = ora
+        } else if sessione.isFree {
+            self.macchina = SessionMachine(openEndedAt: sessione.startedAt, warmUp: riscaldamento)
         } else {
             self.macchina = SessionMachine(exercises: piano, warmUp: riscaldamento, at: sessione.startedAt)
         }
@@ -305,6 +308,55 @@ final class SessioneInCorso: Identifiable {
         if let corrente, esercizi[corrente].isPostponed {
             rimandatiAlle[corrente] = ora
         }
+    }
+
+    // MARK: Sessione libera e Aggiungi esercizi
+
+    /// Durata del riscaldamento fatto (per «Riscaldamento fatto, 6 minuti»).
+    var durataRiscaldamento: TimeInterval? {
+        macchina.pauses.first { $0.kind == .warmUp }?.duration
+    }
+
+    /// Cambio esercizio senza esercizio da fare: si sceglie il prossimo («Scegli esercizi»).
+    var daScegliere: Bool {
+        if case .changeover = fase, macchina.currentExerciseIndex == nil { return true }
+        return false
+    }
+
+    /// «Aggiungi esercizi» (solo per oggi): in fondo all'ordine di oggi, 3 set da 8 a 12 senza
+    /// avvicinamenti, obiettivi dalla volta precedente. La scheda non cambia.
+    func aggiungi(_ nuovi: [Exercise], alle ora: Date = .now) {
+        guard !nuovi.isEmpty else { return }
+        var piani: [PlannedExercise] = []
+        for esercizio in nuovi {
+            let precedenti = WorkoutSession.ultimiSetDiLavoro(esercizio)
+            let registrato = SessionExercise(position: esercizi.count, exercise: esercizio, name: esercizio.name,
+                                             repsMin: FreeSessionText.addedRepsMin,
+                                             repsMax: FreeSessionText.addedRepsMax)
+            context.insert(registrato)
+            registrato.session = sessione
+            let piano = SessionPlanner.plan(workSets: FreeSessionText.addedSets, repsMin: FreeSessionText.addedRepsMin,
+                                            approaches: 0, previous: precedenti, step: PlateStep.standard)
+            var sets: [SessionSet] = []
+            for (posizione, pianificato) in piano.enumerated() {
+                let nuovo = SessionSet(position: posizione, kind: pianificato.kind,
+                                       targetWeight: pianificato.weight, targetReps: pianificato.reps)
+                context.insert(nuovo)
+                nuovo.sessionExercise = registrato
+                sets.append(nuovo)
+            }
+            esercizi.append(registrato)
+            set.append(sets)
+            prima.append(precedenti)
+            piani.append(PlannedExercise(name: esercizio.name, sets: piano))
+        }
+        macchina.appendExercises(piani, at: ora)
+        for (posizione, indice) in macchina.order.enumerated() {
+            esercizi[indice].position = posizione
+        }
+        sessione.lastActivityAt = ora
+        aggiornaRecuperoAbituale()
+        try? context.save()
     }
 
     // MARK: Scaletta

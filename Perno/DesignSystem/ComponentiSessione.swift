@@ -123,6 +123,7 @@ struct DockSessione: View {
     struct Pulsante {
         var titolo: String
         var dettaglio: String? = nil
+        var icona: String? = nil
         var sfondo: Color = .white
         var testo: Color = .suPerno
         let azione: () -> Void
@@ -193,6 +194,11 @@ struct DockSessione: View {
             if let principale {
                 Button(action: principale.azione) {
                     HStack(spacing: 12) {
+                        if let icona = principale.icona {
+                            Image(systemName: icona)
+                                .font(.system(size: 19, weight: .semibold))
+                                .padding(.trailing, -4)
+                        }
                         Text(principale.titolo)
                             .font(.system(size: 19, weight: .semibold))
                         if let dettaglio = principale.dettaglio {

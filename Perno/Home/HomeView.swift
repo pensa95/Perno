@@ -11,6 +11,7 @@ struct HomeView: View {
     /// Apre la sezione Storico («Vedi nello storico»).
     var apriStorico: () -> Void = {}
     var avvia: (Routine) -> Void = { _ in }
+    var avviaLibera: () -> Void = {}
     var riprendi: (WorkoutSession) -> Void = { _ in }
     /// Riapre la schermata della sessione ridotta.
     var apriSessione: () -> Void = {}
@@ -383,7 +384,7 @@ struct HomeView: View {
                 .vocePila()
             }
             Button {
-                // Settimana 3: sessione libera.
+                avviaLibera()
             } label: {
                 VocePila(titolo: "Sessione libera", sottotitolo: "Scegli gli esercizi strada facendo")
             }

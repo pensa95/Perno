@@ -15,6 +15,7 @@ struct SessioneView: View {
     @State private var chiediConclusione = false
     @State private var correzione: Correzione?
     @State private var scalettaAperta = false
+    @State private var aggiungiAperto = false
 
     /// Set fatto aperto in Correggi set.
     struct Correzione: Identifiable {
@@ -33,6 +34,8 @@ struct SessioneView: View {
                             testata(ora: ora)
                             if case .warmUp = sessione.fase {
                                 riscaldamento
+                            } else if sessione.daScegliere {
+                                SceltaEsercizio(sessione: sessione) { aggiungiAperto = true }
                             } else {
                                 esercizio
                             }
@@ -80,6 +83,9 @@ struct SessioneView: View {
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .sheet(isPresented: $aggiungiAperto) {
+            AggiungiEserciziView(sessione: sessione)
+        }
         .sheet(isPresented: $scalettaAperta) {
             ScalettaView(sessione: sessione)
         }
@@ -103,7 +109,7 @@ struct SessioneView: View {
         HStack(spacing: 4) {
             PulsanteTondo(icona: "chevron.down", etichetta: "Riduci la sessione", azione: riduci)
             VStack(spacing: 0) {
-                Text(sessione.sessione.routineName)
+                Text(sessione.sessione.titolo)
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(Color.inchiostroTenue)
                     .lineLimit(1)
@@ -148,6 +154,7 @@ struct SessioneView: View {
             }
             .padding(.top, 32)
 
+            if !sessione.ordineDiOggi.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Poi, in ordine")
                     .font(.footnote.weight(.medium))
@@ -172,6 +179,7 @@ struct SessioneView: View {
                 }
             }
             .padding(.top, 24)
+            }
         }
     }
 
@@ -322,7 +330,10 @@ struct SessioneView: View {
                 secondario: sessione.puoRimandare
                     ? DockSessione.Secondario(titolo: "Rimanda", azione: { sessione.rimanda() })
                     : nil,
-                principale: pulsanteInizia)
+                principale: sessione.daScegliere
+                    ? Optional(DockSessione.Pulsante(titolo: "Scegli esercizi", icona: "plus",
+                                                     azione: { aggiungiAperto = true }))
+                    : pulsanteInizia)
         case let .countdown(dal, inizioPausa, tipo):
             DockSessione(
                 sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,

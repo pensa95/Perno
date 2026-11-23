@@ -39,6 +39,7 @@ struct SezioniView: View {
                 HomeView(sessioneViva: sessione,
                          apriStorico: { sezione = .storico },
                          avvia: avvia,
+                         avviaLibera: avviaLibera,
                          riprendi: riprendi,
                          apriSessione: { schermoSessione = true })
             }
@@ -79,6 +80,14 @@ struct SezioniView: View {
     private func avvia(_ scheda: Routine) {
         guard sessione == nil, !scheda.entries.isEmpty else { return }
         let registro = WorkoutSession.avvia(da: scheda, in: context)
+        sessione = SessioneInCorso(sessione: registro, context: context)
+        schermoSessione = true
+    }
+
+    /// «Sessione libera»: senza esercizi, si scelgono strada facendo.
+    private func avviaLibera() {
+        guard sessione == nil else { return }
+        let registro = WorkoutSession.avviaLibera(in: context)
         sessione = SessioneInCorso(sessione: registro, context: context)
         schermoSessione = true
     }

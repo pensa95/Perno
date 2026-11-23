@@ -31,6 +31,15 @@ extension WorkoutSession {
         return sessione
     }
 
+    /// Sessione libera: nessun esercizio all'inizio, si aggiungono strada facendo.
+    @discardableResult
+    static func avviaLibera(alle inizio: Date = .now, in context: ModelContext) -> WorkoutSession {
+        let sessione = WorkoutSession(routine: nil, startedAt: inizio)
+        context.insert(sessione)
+        try? context.save()
+        return sessione
+    }
+
     /// Set di lavoro fatti l'ultima volta per questo esercizio, in ordine (avvicinamenti esclusi).
     static func ultimiSetDiLavoro(_ esercizio: Exercise) -> [(weight: Double, reps: Int)] {
         let ultima = esercizio.sessionExercises
