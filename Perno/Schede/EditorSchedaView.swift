@@ -87,7 +87,7 @@ struct EditorSchedaView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .riga(sopra: 32, sotto: 120) // spazio per la barra delle sezioni
+            .riga(sopra: 32, sotto: 32)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
