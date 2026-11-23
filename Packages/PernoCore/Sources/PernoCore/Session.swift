@@ -243,3 +243,36 @@ extension SessionMachine {
         phase = .finished
     }
 }
+
+// MARK: - Avviso dopo «Set fatto»
+
+extension SessionMachine {
+    /// Ripetizioni dell'ultimo set fatto (−/+ nell'avviso), nei limiti delle ripetizioni.
+    public mutating func correctLastSet(reps: Int) throws {
+        guard !completedSets.isEmpty else { throw SessionError.invalidTransition }
+        completedSets[completedSets.count - 1].reps = EntryLimits.clamp(reps, EntryLimits.reps)
+    }
+
+    /// «Annulla» nell'avviso: toglie l'ultimo set fatto e torna a quel set in corso, con il suo
+    /// cronometro di prima. Vale solo finché non si è ripartiti (recupero, cambio esercizio o fine).
+    public mutating func undoLastSet() throws {
+        guard let last = completedSets.last else { throw SessionError.invalidTransition }
+        let previousPosition: Int
+        switch phase {
+        case .rest:
+            previousPosition = position
+        case .changeover, .finished:
+            previousPosition = position - 1
+        default:
+            throw SessionError.invalidTransition
+        }
+        guard previousPosition >= 0, previousPosition < order.count,
+              order[previousPosition] == last.exerciseIndex else {
+            throw SessionError.invalidTransition
+        }
+        completedSets.removeLast()
+        position = previousPosition
+        setIndex = last.setIndex
+        phase = .inSet(since: last.startedAt)
+    }
+}

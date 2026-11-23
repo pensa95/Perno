@@ -74,3 +74,10 @@ final class SessionTextTests: XCTestCase {
         XCTAssertEqual(session.phase, .finished)
     }
 }
+
+final class NoticeTitleTests: XCTestCase {
+    func testNoticeTitle() {
+        XCTAssertEqual(SessionText.noticeTitle(.work, 1, weight: 62.5), "Set 1, 62,5 ×")
+        XCTAssertEqual(SessionText.noticeTitle(.approach, 2, weight: 45), "Avv. 2, 45 ×")
+    }
+}

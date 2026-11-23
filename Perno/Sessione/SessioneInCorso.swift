@@ -20,6 +20,16 @@ final class SessioneInCorso: Identifiable {
     private(set) var macchina: SessionMachine
     /// Recupero abituale dell'esercizio corrente; aggiornato a ogni tocco.
     private(set) var recuperoAbituale: TimeInterval? = nil
+    /// Avviso dopo «Set fatto» (ripetizioni, riserva, Annulla); `nil` quando è chiuso.
+    private(set) var avviso: Avviso? = nil
+    /// Secondi in cui l'avviso resta aperto; ogni tocco li rinnova.
+    static let durataAvviso: TimeInterval = 5
+
+    struct Avviso: Equatable {
+        let esercizio: Int
+        let set: Int
+        var scadenza: Date
+    }
 
     private let context: ModelContext
     private var setScritti = 0
@@ -49,9 +59,17 @@ final class SessioneInCorso: Identifiable {
 
     var fase: SessionPhase { macchina.phase }
 
-    var esercizioCorrente: SessionExercise? {
-        macchina.currentExerciseIndex.map { esercizi[$0] }
+    /// Esercizio sullo schermo: quello corrente; a sessione finita, quello dell'ultimo avviso.
+    var indiceEsercizio: Int? {
+        macchina.currentExerciseIndex ?? avviso?.esercizio
     }
+
+    var esercizioCorrente: SessionExercise? {
+        indiceEsercizio.map { esercizi[$0] }
+    }
+
+    /// Vero quando la sessione è chiusa: la schermata si chiude.
+    private(set) var conclusa = false
 
     var setCorrente: SessionSet? {
         guard let indice = macchina.currentExerciseIndex, macchina.setIndex < set[indice].count else { return nil }
@@ -59,7 +77,7 @@ final class SessioneInCorso: Identifiable {
     }
 
     /// Posizione dell'esercizio corrente nell'ordine di oggi (1…).
-    var numeroEsercizio: Int { macchina.position + 1 }
+    var numeroEsercizio: Int { min(macchina.position + 1, macchina.order.count) }
 
     /// Numero del set corrente dentro il suo tipo («Avv. 2», «Set 1»).
     var numeroSetCorrente: Int {
@@ -82,20 +100,92 @@ final class SessioneInCorso: Identifiable {
 
     func riscaldamentoFatto(alle ora: Date = .now) { esegui(ora) { try $0.endWarmUp(at: ora) } }
 
-    func inizia(alle ora: Date = .now) { esegui(ora) { try $0.start(at: ora) } }
+    func inizia(alle ora: Date = .now) {
+        avviso = nil
+        esegui(ora) { try $0.start(at: ora) }
+    }
 
     func annullaContoAllaRovescia() { esegui(.now) { try $0.cancelCountdown() } }
 
     func contoAllaRovesciaFinito(alle ora: Date) { esegui(ora) { try $0.countdownFinished(at: ora) } }
 
-    func setFatto(alle ora: Date = .now) { esegui(ora) { try $0.setDone(at: ora) } }
+    func setFatto(alle ora: Date = .now) {
+        let fattiPrima = macchina.completedSets.count
+        esegui(ora) { try $0.setDone(at: ora) }
+        if let fatto = macchina.completedSets.last, macchina.completedSets.count > fattiPrima {
+            avviso = Avviso(esercizio: fatto.exerciseIndex, set: fatto.setIndex,
+                            scadenza: ora.addingTimeInterval(Self.durataAvviso))
+        }
+    }
+
+    // MARK: Avviso dopo «Set fatto»
+
+    /// Set dell'avviso, con i valori registrati.
+    var setDellAvviso: SessionSet? {
+        avviso.map { set[$0.esercizio][$0.set] }
+    }
+
+    /// −/+ sulle ripetizioni del set appena fatto.
+    func cambiaRipetizioni(di passo: Int, alle ora: Date = .now) {
+        guard let registrato = setDellAvviso, let attuali = registrato.reps else { return }
+        do {
+            try macchina.correctLastSet(reps: attuali + passo)
+        } catch {
+            return
+        }
+        registrato.reps = macchina.completedSets.last?.reps
+        rinnovaAvviso(ora)
+    }
+
+    /// «Quante ne avevi ancora?»: un secondo tocco sullo stesso valore lo toglie.
+    func scegliRiserva(_ riserva: Reserve, alle ora: Date = .now) {
+        guard let registrato = setDellAvviso else { return }
+        registrato.reserve = registrato.reserve == riserva ? nil : riserva
+        rinnovaAvviso(ora)
+    }
+
+    /// «Annulla»: il set torna in corso, con il cronometro di prima.
+    func annullaSetFatto(alle ora: Date = .now) {
+        guard let registrato = setDellAvviso else { return }
+        do {
+            try macchina.undoLastSet()
+        } catch {
+            return
+        }
+        registrato.weight = nil
+        registrato.reps = nil
+        registrato.reserve = nil
+        registrato.startedAt = nil
+        registrato.endedAt = nil
+        setScritti = macchina.completedSets.count
+        avviso = nil
+        sessione.lastActivityAt = ora
+        aggiornaRecuperoAbituale()
+        try? context.save()
+    }
+
+    /// Fine dei 5 s senza tocchi.
+    func chiudiAvviso() {
+        avviso = nil
+        if macchina.phase == .finished {
+            concludi()
+        }
+    }
+
+    private func rinnovaAvviso(_ ora: Date) {
+        avviso?.scadenza = ora.addingTimeInterval(Self.durataAvviso)
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
 
     func rimanda() { esegui(.now) { try $0.postponeCurrent() } }
 
-    /// «Concludi», o fine dell'ultimo set. Il riepilogo arriva nella settimana 4: per ora la
+    /// «Concludi», o fine dell'ultimo set (quando si chiude il suo avviso). Il riepilogo arriva nella settimana 4: per ora la
     /// sessione si chiude e va nello storico così com'è.
     func concludi(alle ora: Date = .now) {
         macchina.finish()
+        avviso = nil
+        conclusa = true
         sessione.endedAt = sessione.endedAt ?? ora
         sessione.isSaved = true
         sessione.lastActivityAt = ora
@@ -110,9 +200,6 @@ final class SessioneInCorso: Identifiable {
             return
         }
         scriviNelRegistro(ora: ora, ordinePrima: ordinePrima)
-        if macchina.phase == .finished {
-            concludi(alle: ora)
-        }
     }
 
     // MARK: Registro

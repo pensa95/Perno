@@ -34,6 +34,10 @@ struct SessioneView: View {
                 }
                 .ignoresSafeArea(edges: .bottom)
 
+                if sessione.avviso != nil, let set = sessione.setDellAvviso {
+                    avvisoSetFatto(set)
+                }
+
                 if case let .countdown(dal, _, _) = sessione.fase {
                     contoAllaRovescia(trascorsi: ora.timeIntervalSince(dal))
                 }
@@ -50,16 +54,22 @@ struct SessioneView: View {
             guard !Task.isCancelled else { return }
             sessione.contoAllaRovesciaFinito(alle: fine)
         }
-        .onChange(of: sessione.fase) { _, fase in
-            if fase == .finished { chiudi() }
+        .task(id: sessione.avviso?.scadenza) {
+            guard let scadenza = sessione.avviso?.scadenza else { return }
+            let attesa = scadenza.timeIntervalSinceNow
+            if attesa > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
+            }
+            guard !Task.isCancelled, sessione.avviso?.scadenza == scadenza else { return }
+            sessione.chiudiAvviso()
+        }
+        .onChange(of: sessione.conclusa) { _, conclusa in
+            if conclusa { chiudi() }
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .confirmationDialog("Concludere la sessione?", isPresented: $chiediConclusione, titleVisibility: .visible) {
-            Button("Concludi sessione") {
-                sessione.concludi()
-                chiudi()
-            }
+            Button("Concludi sessione") { sessione.concludi() }
             Button("Continua", role: .cancel) {}
         }
     }
@@ -158,7 +168,7 @@ struct SessioneView: View {
 
     @ViewBuilder
     private var esercizio: some View {
-        if let esercizio = sessione.esercizioCorrente, let indice = sessione.macchina.currentExerciseIndex {
+        if let esercizio = sessione.esercizioCorrente, let indice = sessione.indiceEsercizio {
             HStack(alignment: .bottom, spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(SessionText.exerciseHeader(position: sessione.numeroEsercizio,
@@ -326,6 +336,100 @@ struct SessioneView: View {
 
     private func setCorrente(_ testo: (SetKind, Int) -> String) -> String {
         testo(sessione.setCorrente?.kind ?? .work, sessione.numeroSetCorrente)
+    }
+
+    // MARK: Avviso dopo «Set fatto»
+
+    /// Sopra il dock: spunta, «Set 1, 62,5 ×», −/+ sulle ripetizioni, «Annulla» e la riserva.
+    private func avvisoSetFatto(_ set: SessionSet) -> some View {
+        let indice = sessione.avviso?.esercizio ?? 0
+        let numeri = SessionText.numbers(sessione.set[indice].map(\.kind))
+        let numero = numeri[safe: sessione.avviso?.set ?? 0] ?? 1
+        let ripetizioni = set.reps ?? set.targetReps
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .bold))
+                Text(SessionText.noticeTitle(set.kind, numero, weight: set.weight ?? set.targetWeight))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 2) {
+                    tastoRipetizioni("minus", etichetta: "Una ripetizione in meno",
+                                     attivo: ripetizioni > EntryLimits.reps.lowerBound) {
+                        sessione.cambiaRipetizioni(di: -1)
+                    }
+                    Text("\(ripetizioni)")
+                        .font(.piastra(24))
+                        .monospacedDigit()
+                        .frame(minWidth: 22)
+                    tastoRipetizioni("plus", etichetta: "Una ripetizione in più",
+                                     attivo: ripetizioni < EntryLimits.reps.upperBound) {
+                        sessione.cambiaRipetizioni(di: 1)
+                    }
+                }
+                .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Button {
+                    sessione.annullaSetFatto()
+                } label: {
+                    Text("Annulla")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .frame(height: 40)
+                        .background(Color.lamiera, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Quante ne avevi ancora?")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.inchiostroTenue)
+                HStack(spacing: 6) {
+                    ForEach(Reserve.allCases, id: \.self) { riserva in
+                        let scelta = set.reserve == riserva
+                        Button {
+                            sessione.scegliRiserva(riserva)
+                        } label: {
+                            Text(riserva.label)
+                                .font(.piastra(22))
+                                .foregroundStyle(scelta ? Color.foglio : Color.inchiostro)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(scelta ? Color.inchiostro : Color.lamiera,
+                                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(scelta ? .isSelected : [])
+                    }
+                }
+            }
+            .padding(.trailing, 8)
+        }
+        .foregroundStyle(Color.inchiostro)
+        .padding(.top, 8)
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .padding(.bottom, 12)
+        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color(UIColor(hex: 0x1C2226)).opacity(0.24), radius: 16, x: 0, y: 12)
+        .shadow(color: Color(UIColor(hex: 0x1C2226)).opacity(0.16), radius: 4, x: 0, y: 2)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 236)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .ignoresSafeArea(edges: .bottom)
+        .transition(.opacity)
+    }
+
+    private func tastoRipetizioni(_ icona: String, etichetta: String, attivo: Bool,
+                                  azione: @escaping () -> Void) -> some View {
+        Button(action: azione) {
+            Image(systemName: icona)
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 40, height: 40)
+        }
+        .buttonStyle(.plain)
+        .disabled(!attivo)
+        .opacity(attivo ? 1 : 0.35)
+        .accessibilityLabel(etichetta)
     }
 
     // MARK: 3-2-1
