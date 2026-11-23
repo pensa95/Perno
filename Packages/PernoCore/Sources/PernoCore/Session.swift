@@ -276,3 +276,89 @@ extension SessionMachine {
         phase = .inSet(since: last.startedAt)
     }
 }
+
+// MARK: - Correggi set
+
+extension SessionMachine {
+    /// «Salva» in Correggi set: nuovi valori di un set fatto. Se cambia il peso di un set di lavoro,
+    /// i set dopo, non ancora fatti, che avevano lo stesso obiettivo prendono il peso nuovo
+    /// (così la prima volta, con l'obiettivo a 0, basta correggere il primo set).
+    /// Restituisce gli indici dei set a cui è cambiato l'obiettivo.
+    @discardableResult
+    public mutating func correctSet(exercise: Int, set: Int, weight: Double, reps: Int,
+                                    kind: SetKind) throws -> [Int] {
+        guard let done = completedSets.firstIndex(where: { $0.exerciseIndex == exercise && $0.setIndex == set }) else {
+            throw SessionError.invalidTransition
+        }
+        let oldWeight = completedSets[done].weight
+        completedSets[done].weight = SetCorrection.clampWeight(weight)
+        completedSets[done].reps = EntryLimits.clamp(reps, EntryLimits.reps)
+        completedSets[done].kind = kind
+        let newWeight = completedSets[done].weight
+
+        guard kind != .approach, abs(newWeight - oldWeight) > 0.001 else { return [] }
+        var changed: [Int] = []
+        for index in exercises[exercise].sets.indices where index > set {
+            let planned = exercises[exercise].sets[index]
+            let isDone = completedSets.contains { $0.exerciseIndex == exercise && $0.setIndex == index }
+            guard !isDone, planned.kind != .approach, abs(planned.weight - oldWeight) < 0.001 else { continue }
+            exercises[exercise].sets[index].weight = newWeight
+            changed.append(index)
+        }
+        return changed
+    }
+
+    /// «Elimina set»: il set torna non fatto (resta nella scheda di oggi, senza valori).
+    public mutating func removeSet(exercise: Int, set: Int) throws {
+        guard let done = completedSets.firstIndex(where: { $0.exerciseIndex == exercise && $0.setIndex == set }) else {
+            throw SessionError.invalidTransition
+        }
+        completedSets.remove(at: done)
+    }
+}
+
+/// Correggi set: limiti, passi e testi.
+public enum SetCorrection {
+    public static let weights: ClosedRange<Double> = 0...500
+
+    public static func clampWeight(_ weight: Double) -> Double {
+        min(max(weight, weights.lowerBound), weights.upperBound)
+    }
+
+    /// −/+ sul peso: un passo dei dischi, senza uscire dai limiti.
+    public static func stepWeight(_ weight: Double, by delta: Double) -> Double {
+        clampWeight(((weight + delta) * 100).rounded() / 100)
+    }
+
+    /// Peso scritto con il tastierino: «62,5» o «62.5». `nil` se non è un numero.
+    public static func parseWeight(_ text: String) -> Double? {
+        let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(cleaned), value.isFinite else { return nil }
+        return clampWeight((value * 100).rounded() / 100)
+    }
+
+    /// Ripetizioni scritte con il tastierino. `nil` se non è un numero intero.
+    public static func parseReps(_ text: String) -> Int? {
+        guard let value = Int(text.trimmingCharacters(in: .whitespaces)) else { return nil }
+        return EntryLimits.clamp(value, EntryLimits.reps)
+    }
+
+    /// Riga sotto «Altri dettagli»: «Set normale, ne avevi ancora 1».
+    public static func details(kind: SetKind, reserve: Reserve?) -> String {
+        let type: String
+        switch kind {
+        case .approach: type = "Avvicinamento"
+        case .work: type = "Set normale"
+        case .drop: type = "Drop set"
+        case .failure: type = "Set a cedimento"
+        }
+        guard let reserve else { return type }
+        return "\(type), ne avevi ancora \(reserve.label)"
+    }
+
+    /// «Chest press, fatto in 0:31».
+    public static func subtitle(exercise: String, duration: TimeInterval?) -> String {
+        guard let duration else { return exercise }
+        return "\(exercise), fatto in \(SessionText.clock(duration))"
+    }
+}

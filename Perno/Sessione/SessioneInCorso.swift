@@ -118,6 +118,53 @@ final class SessioneInCorso: Identifiable {
         }
     }
 
+    // MARK: Correggi set
+
+    /// «Salva» in Correggi set. I set dopo con lo stesso obiettivo prendono il peso nuovo.
+    func correggi(esercizio: Int, set indice: Int, peso: Double, ripetizioni: Int,
+                  tipo: SetKind, riserva: Reserve?, alle ora: Date = .now) {
+        let registrato = set[esercizio][indice]
+        let cambiati: [Int]
+        do {
+            cambiati = try macchina.correctSet(exercise: esercizio, set: indice, weight: peso,
+                                               reps: ripetizioni, kind: tipo)
+        } catch {
+            return
+        }
+        if let fatto = macchina.completedSets.first(where: { $0.exerciseIndex == esercizio && $0.setIndex == indice }) {
+            registrato.weight = fatto.weight
+            registrato.reps = fatto.reps
+            registrato.kind = fatto.kind
+        }
+        registrato.reserve = riserva
+        for cambiato in cambiati {
+            set[esercizio][cambiato].targetWeight = macchina.exercises[esercizio].sets[cambiato].weight
+        }
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// «Elimina set»: il set torna non fatto.
+    func eliminaSet(esercizio: Int, set indice: Int, alle ora: Date = .now) {
+        do {
+            try macchina.removeSet(exercise: esercizio, set: indice)
+        } catch {
+            return
+        }
+        let registrato = set[esercizio][indice]
+        registrato.weight = nil
+        registrato.reps = nil
+        registrato.reserve = nil
+        registrato.startedAt = nil
+        registrato.endedAt = nil
+        setScritti = macchina.completedSets.count
+        if avviso?.esercizio == esercizio && avviso?.set == indice {
+            avviso = nil
+        }
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
     // MARK: Avviso dopo «Set fatto»
 
     /// Set dell'avviso, con i valori registrati.

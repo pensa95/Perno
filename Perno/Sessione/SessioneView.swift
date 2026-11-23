@@ -10,6 +10,14 @@ struct SessioneView: View {
     let chiudi: () -> Void
 
     @State private var chiediConclusione = false
+    @State private var correzione: Correzione?
+
+    /// Set fatto aperto in Correggi set.
+    struct Correzione: Identifiable {
+        let esercizio: Int
+        let set: Int
+        var id: String { "\(esercizio)-\(set)" }
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
@@ -68,6 +76,9 @@ struct SessioneView: View {
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .sheet(item: $correzione) { correzione in
+            CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
+        }
         .confirmationDialog("Concludere la sessione?", isPresented: $chiediConclusione, titleVisibility: .visible) {
             Button("Concludi sessione") { sessione.concludi() }
             Button("Continua", role: .cancel) {}
@@ -196,7 +207,17 @@ struct SessioneView: View {
 
             VStack(spacing: 4) {
                 ForEach(Array(sessione.set[indice].enumerated()), id: \.offset) { posizione, set in
-                    piastra(set, posizione: posizione, esercizio: indice)
+                    if set.isDone {
+                        Button {
+                            correzione = Correzione(esercizio: indice, set: posizione)
+                        } label: {
+                            piastra(set, posizione: posizione, esercizio: indice)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Correggi set")
+                    } else {
+                        piastra(set, posizione: posizione, esercizio: indice)
+                    }
                 }
             }
             .padding(.top, 16)
