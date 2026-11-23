@@ -113,6 +113,8 @@ public struct SessionMachine: Sendable {
     public private(set) var phase: SessionPhase
     public private(set) var completedSets: [CompletedSet] = []
     public private(set) var pauses: [Pause] = []
+    /// Sessione libera: finiti gli esercizi non finisce, torna al cambio esercizio («Scegli esercizi»).
+    public private(set) var isOpenEnded = false
 
     public init(exercises: [PlannedExercise], warmUp: Bool, at now: Date) {
         self.exercises = exercises
@@ -143,6 +145,7 @@ public struct SessionMachine: Sendable {
 
     /// «Inizia set N» (o «Inizia avvicinamento N»): chiude la pausa e parte il 3-2-1.
     public mutating func start(at now: Date) throws {
+        guard currentSet != nil else { throw SessionError.invalidTransition }
         switch phase {
         case let .changeover(since):
             phase = .countdown(since: now, pauseStart: since, pauseKind: .changeover)
@@ -188,7 +191,7 @@ public struct SessionMachine: Sendable {
         } else {
             position += 1
             setIndex = 0
-            phase = position < order.count ? .changeover(since: now) : .finished
+            phase = position < order.count || isOpenEnded ? .changeover(since: now) : .finished
         }
     }
 
@@ -449,8 +452,16 @@ extension SessionMachine {
     /// Ripresa: riparte dal set dopo l'ultimo «Set fatto». Se l'esercizio ha ancora set, il recupero
     /// riparte da adesso; altrimenti cambio esercizio (da adesso) sul primo esercizio dopo con set
     /// da fare. Il riscaldamento non si ripete.
-    public init(resuming exercises: [PlannedExercise], completed: [CompletedSet], pauses: [Pause], at now: Date) {
+    public init(resuming exercises: [PlannedExercise], completed: [CompletedSet], pauses: [Pause],
+                openEnded: Bool = false, at now: Date) {
         self.init(exercises: exercises, warmUp: false, at: now)
+        isOpenEnded = openEnded
+        if openEnded && exercises.isEmpty {
+            completedSets = []
+            self.pauses = pauses
+            phase = .changeover(since: now)
+            return
+        }
         let sorted = completed.sorted { $0.endedAt < $1.endedAt }
         completedSets = sorted
         self.pauses = pauses
@@ -482,6 +493,29 @@ extension SessionMachine {
         }
         position = order.count
         setIndex = 0
-        phase = .finished
+        phase = openEnded ? .changeover(since: now) : .finished
+    }
+}
+
+// MARK: - Sessione libera
+
+extension SessionMachine {
+    /// Sessione libera: si apre con il riscaldamento (se attivo) e senza esercizi; si aggiungono strada facendo.
+    public init(openEndedAt now: Date, warmUp: Bool) {
+        self.init(exercises: [], warmUp: false, at: now)
+        isOpenEnded = true
+        phase = warmUp ? .warmUp(since: now) : .changeover(since: now)
+    }
+
+    /// «Aggiungi esercizi» (solo per oggi): in fondo all'ordine di oggi. Se non c'era niente da fare,
+    /// il primo aggiunto diventa l'esercizio di adesso.
+    public mutating func appendExercises(_ added: [PlannedExercise], at now: Date) {
+        guard !added.isEmpty else { return }
+        let first = exercises.count
+        exercises.append(contentsOf: added)
+        order.append(contentsOf: first..<exercises.count)
+        if phase == .finished {
+            phase = .changeover(since: now)
+        }
     }
 }

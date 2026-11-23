@@ -7,6 +7,7 @@ struct ScalettaView: View {
     let sessione: SessioneInCorso
 
     @Environment(\.dismiss) private var dismiss
+    @State private var aggiungiAperto = false
 
     var body: some View {
         let scaletta = sessione.scaletta
@@ -66,7 +67,7 @@ struct ScalettaView: View {
                 }
 
                 Button {
-                    // «Aggiungi esercizio» (solo per oggi): con la sessione libera, prossimi task.
+                    aggiungiAperto = true
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
@@ -79,8 +80,6 @@ struct ScalettaView: View {
                     .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(true)
-                .opacity(0.4)
                 .riga(sopra: 20, sotto: 32)
             }
             .listStyle(.plain)
@@ -89,6 +88,9 @@ struct ScalettaView: View {
         }
         .stileFoglio()
         .presentationDetents([.large])
+        .sheet(isPresented: $aggiungiAperto) {
+            AggiungiEserciziView(sessione: sessione)
+        }
     }
 
     // MARK: Righe
