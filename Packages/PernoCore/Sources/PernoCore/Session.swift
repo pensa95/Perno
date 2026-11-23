@@ -362,3 +362,60 @@ public enum SetCorrection {
         return "\(exercise), fatto in \(SessionText.clock(duration))"
     }
 }
+
+// MARK: - Correggi un set non ancora fatto
+
+extension SessionMachine {
+    /// Correggi set su un set da fare (anche quello di adesso): cambia l'obiettivo.
+    /// Se cambia il peso di un set di lavoro, i set dopo non ancora fatti con lo stesso obiettivo
+    /// prendono il peso nuovo; se è il primo set di lavoro, anche gli avvicinamenti non ancora
+    /// fatti si ricalcolano in percentuale (solo quelli che seguivano ancora la regola).
+    /// Restituisce gli indici dei set a cui è cambiato l'obiettivo.
+    @discardableResult
+    public mutating func retargetSet(exercise: Int, set: Int, weight: Double, reps: Int,
+                                     kind: SetKind, step: Double) throws -> [Int] {
+        guard exercises.indices.contains(exercise), exercises[exercise].sets.indices.contains(set),
+              !isDone(exercise: exercise, set: set) else {
+            throw SessionError.invalidTransition
+        }
+        let oldWeight = exercises[exercise].sets[set].weight
+        let newWeight = SetCorrection.clampWeight(weight)
+        exercises[exercise].sets[set] = PlannedSet(kind: kind, weight: newWeight,
+                                                   reps: EntryLimits.clamp(reps, EntryLimits.reps))
+        var changed: Set<Int> = [set]
+        guard kind != .approach, abs(newWeight - oldWeight) > 0.001 else { return changed.sorted() }
+
+        let sets = exercises[exercise].sets
+        for index in sets.indices where index > set {
+            guard !isDone(exercise: exercise, set: index), sets[index].kind != .approach,
+                  abs(sets[index].weight - oldWeight) < 0.001 else { continue }
+            exercises[exercise].sets[index].weight = newWeight
+            changed.insert(index)
+        }
+
+        let firstWork = sets.firstIndex { $0.kind != .approach }
+        if firstWork == set {
+            let approachIndices = sets.indices.filter { sets[$0].kind == .approach }
+            let before = Approach.weights(count: approachIndices.count, workWeight: oldWeight, step: step)
+            let after = Approach.weights(count: approachIndices.count, workWeight: newWeight, step: step)
+            for (number, index) in approachIndices.enumerated() where number < before.count {
+                guard !isDone(exercise: exercise, set: index),
+                      abs(sets[index].weight - before[number]) < 0.001 else { continue }
+                exercises[exercise].sets[index].weight = after[number]
+                changed.insert(index)
+            }
+        }
+        return changed.sorted()
+    }
+
+    public func isDone(exercise: Int, set: Int) -> Bool {
+        completedSets.contains { $0.exerciseIndex == exercise && $0.setIndex == set }
+    }
+}
+
+extension SetCorrection {
+    /// Sottotitolo di Correggi set su un set da fare: «Chest press, obiettivo».
+    public static func targetSubtitle(exercise: String) -> String {
+        "\(exercise), obiettivo"
+    }
+}

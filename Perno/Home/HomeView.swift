@@ -15,6 +15,7 @@ struct HomeView: View {
 
     @Environment(\.modelContext) private var context
     @State private var sessioneAperta: SessioneInCorso?
+    @State private var sessioneDaAnnullare: WorkoutSession?
 
     private var calendario: Calendar { .current }
 
@@ -115,6 +116,16 @@ struct HomeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        .confirmationDialog("Annullare la sessione?",
+                            isPresented: Binding(get: { sessioneDaAnnullare != nil },
+                                                 set: { if !$0 { sessioneDaAnnullare = nil } }),
+                            titleVisibility: .visible,
+                            presenting: sessioneDaAnnullare) { sessione in
+            Button("Annulla sessione", role: .destructive) { annulla(sessione) }
+            Button("Mantieni", role: .cancel) {}
+        } message: { _ in
+            Text("La sessione viene eliminata con tutti i set e oggi torna da fare.")
+        }
         .fullScreenCover(item: $sessioneAperta) { sessione in
             SessioneView(sessione: sessione) { sessioneAperta = nil }
         }
@@ -125,6 +136,13 @@ struct HomeView: View {
         guard !scheda.entries.isEmpty else { return }
         let sessione = WorkoutSession.avvia(da: scheda, in: context)
         sessioneAperta = SessioneInCorso(sessione: sessione, context: context)
+    }
+
+    /// «Annulla sessione» sulla card di oggi fatto: elimina la sessione (set e pause compresi).
+    private func annulla(_ sessione: WorkoutSession) {
+        context.delete(sessione)
+        try? context.save()
+        sessioneDaAnnullare = nil
     }
 
     private var titoloOggi: String { "Oggi, \(Weekday.name(oggi).lowercased())" }
@@ -192,6 +210,16 @@ struct HomeView: View {
                 numero(HomeText.volume(sessione.chiliSollevati), "kg sollevati")
             }
             PulsanteSecondario(titolo: "Vedi nello storico", azione: apriStorico)
+            Button {
+                sessioneDaAnnullare = sessione
+            } label: {
+                Text("Annulla sessione")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.errore)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, -8)
         }
         .padding(.top, 20)
         .padding(.horizontal, 16)

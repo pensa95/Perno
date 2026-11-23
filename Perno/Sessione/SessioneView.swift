@@ -207,17 +207,13 @@ struct SessioneView: View {
 
             VStack(spacing: 4) {
                 ForEach(Array(sessione.set[indice].enumerated()), id: \.offset) { posizione, set in
-                    if set.isDone {
-                        Button {
-                            correzione = Correzione(esercizio: indice, set: posizione)
-                        } label: {
-                            piastra(set, posizione: posizione, esercizio: indice)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Correggi set")
-                    } else {
+                    Button {
+                        correzione = Correzione(esercizio: indice, set: posizione)
+                    } label: {
                         piastra(set, posizione: posizione, esercizio: indice)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Correggi set")
                 }
             }
             .padding(.top, 16)

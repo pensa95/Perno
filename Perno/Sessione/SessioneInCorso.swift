@@ -120,14 +120,21 @@ final class SessioneInCorso: Identifiable {
 
     // MARK: Correggi set
 
-    /// «Salva» in Correggi set. I set dopo con lo stesso obiettivo prendono il peso nuovo.
+    /// «Salva» in Correggi set. Su un set fatto corregge i valori registrati; su un set da fare
+    /// (anche quello di adesso) cambia l'obiettivo. I set dopo con lo stesso obiettivo prendono il
+    /// peso nuovo (e, dal primo set di lavoro, anche gli avvicinamenti da fare).
     func correggi(esercizio: Int, set indice: Int, peso: Double, ripetizioni: Int,
                   tipo: SetKind, riserva: Reserve?, alle ora: Date = .now) {
         let registrato = set[esercizio][indice]
         let cambiati: [Int]
         do {
-            cambiati = try macchina.correctSet(exercise: esercizio, set: indice, weight: peso,
-                                               reps: ripetizioni, kind: tipo)
+            if macchina.isDone(exercise: esercizio, set: indice) {
+                cambiati = try macchina.correctSet(exercise: esercizio, set: indice, weight: peso,
+                                                   reps: ripetizioni, kind: tipo)
+            } else {
+                cambiati = try macchina.retargetSet(exercise: esercizio, set: indice, weight: peso,
+                                                    reps: ripetizioni, kind: tipo, step: PlateStep.standard)
+            }
         } catch {
             return
         }
@@ -135,10 +142,14 @@ final class SessioneInCorso: Identifiable {
             registrato.weight = fatto.weight
             registrato.reps = fatto.reps
             registrato.kind = fatto.kind
+            registrato.reserve = riserva
         }
-        registrato.reserve = riserva
         for cambiato in cambiati {
-            set[esercizio][cambiato].targetWeight = macchina.exercises[esercizio].sets[cambiato].weight
+            let piano = macchina.exercises[esercizio].sets[cambiato]
+            let daAggiornare = set[esercizio][cambiato]
+            daAggiornare.targetWeight = piano.weight
+            daAggiornare.targetReps = piano.reps
+            daAggiornare.kind = piano.kind
         }
         sessione.lastActivityAt = ora
         try? context.save()

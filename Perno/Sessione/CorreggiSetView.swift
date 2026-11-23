@@ -3,7 +3,8 @@ import PernoCore
 
 /// Correggi set (tavola 8): peso e ripetizioni in due blocchi grandi con −/+ (tocco sul numero =
 /// tastierino), «Altri dettagli» chiuso con tipo di set e riserva, «Salva» giallo, «Elimina set» rosso.
-/// La X chiude senza salvare.
+/// La X chiude senza salvare. Su un set da fare (anche quello di adesso) cambia l'obiettivo:
+/// niente riserva né «Elimina set».
 struct CorreggiSetView: View {
     let sessione: SessioneInCorso
     let esercizio: Int
@@ -35,6 +36,9 @@ struct CorreggiSetView: View {
 
     private var set: SessionSet { sessione.set[esercizio][indice] }
 
+    /// Set già fatto (correzione dei valori) o da fare (obiettivo).
+    private var fatto: Bool { sessione.macchina.isDone(exercise: esercizio, set: indice) }
+
     private var nome: String {
         let numeri = SessionText.numbers(sessione.set[esercizio].map(\.kind))
         return SessionText.shortName(set.kind, numeri[indice])
@@ -47,8 +51,10 @@ struct CorreggiSetView: View {
                     Text(nome)
                         .font(.piastra(32))
                         .foregroundStyle(Color.inchiostro)
-                    Text(SetCorrection.subtitle(exercise: sessione.esercizi[esercizio].name,
-                                                duration: set.setDuration))
+                    Text(fatto
+                         ? SetCorrection.subtitle(exercise: sessione.esercizi[esercizio].name,
+                                                  duration: set.setDuration)
+                         : SetCorrection.targetSubtitle(exercise: sessione.esercizi[esercizio].name))
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(Color.inchiostroTenue)
                 }
@@ -96,16 +102,18 @@ struct CorreggiSetView: View {
                                   tipo: tipo, riserva: riserva)
                 dismiss()
             }
-            Button {
-                chiediEliminazione = true
-            } label: {
-                Text("Elimina set")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.errore)
-                    .frame(maxWidth: .infinity, minHeight: 44)
+            if fatto {
+                Button {
+                    chiediEliminazione = true
+                } label: {
+                    Text("Elimina set")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.errore)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, -8)
             }
-            .buttonStyle(.plain)
-            .padding(.top, -8)
         }
         .padding(.top, 24)
         .padding(.horizontal, 20)
@@ -197,7 +205,7 @@ struct CorreggiSetView: View {
                         Text("Altri dettagli")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(Color.inchiostro)
-                        Text(SetCorrection.details(kind: tipo, reserve: riserva))
+                        Text(SetCorrection.details(kind: tipo, reserve: fatto ? riserva : nil))
                             .font(.footnote)
                             .foregroundStyle(Color.inchiostroTenue)
                     }
@@ -221,11 +229,13 @@ struct CorreggiSetView: View {
                         }
                     }
                 }
-                EtichettaSezione("Quante ne avevi ancora?")
-                HStack(spacing: 6) {
-                    ForEach(Reserve.allCases, id: \.self) { valore in
-                        Scelta(titolo: valore.label, scelta: valore == riserva, altezza: 44, riempi: true) {
-                            riserva = riserva == valore ? nil : valore
+                if fatto {
+                    EtichettaSezione("Quante ne avevi ancora?")
+                    HStack(spacing: 6) {
+                        ForEach(Reserve.allCases, id: \.self) { valore in
+                            Scelta(titolo: valore.label, scelta: valore == riserva, altezza: 44, riempi: true) {
+                                riserva = riserva == valore ? nil : valore
+                            }
                         }
                     }
                 }
