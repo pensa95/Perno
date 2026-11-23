@@ -419,3 +419,15 @@ extension SetCorrection {
         "\(exercise), obiettivo"
     }
 }
+
+// MARK: - Scaletta
+
+extension SessionMachine {
+    /// Nuovo ordine degli esercizi dopo quello di adesso (stessi esercizi, ordine diverso).
+    public mutating func reorderUpcoming(_ tail: [Int]) throws {
+        guard position < order.count else { throw SessionError.invalidTransition }
+        let current = Array(order[(position + 1)...])
+        guard tail.sorted() == current.sorted() else { throw SessionError.invalidTransition }
+        order = Array(order[...position]) + tail
+    }
+}

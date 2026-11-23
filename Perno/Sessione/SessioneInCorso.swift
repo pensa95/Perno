@@ -40,6 +40,8 @@ final class SessioneInCorso: Identifiable {
     }
 
     private let context: ModelContext
+    /// Orario di «Rimanda» per esercizio (per «Macchinario occupato alle 18:20» nella scaletta).
+    private(set) var rimandatiAlle: [Int: Date] = [:]
     private var setScritti = 0
     private var pauseScritte = 0
 
@@ -271,7 +273,47 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
-    func rimanda() { esegui(.now) { try $0.postponeCurrent() } }
+    func rimanda(alle ora: Date = .now) {
+        let corrente = macchina.currentExerciseIndex
+        esegui(ora) { try $0.postponeCurrent() }
+        if let corrente, esercizi[corrente].isPostponed {
+            rimandatiAlle[corrente] = ora
+        }
+    }
+
+    // MARK: Scaletta
+
+    var scaletta: Lineup {
+        Lineup(order: macchina.order, position: macchina.position,
+               postponed: Set(esercizi.indices.filter { esercizi[$0].isPostponed }))
+    }
+
+    /// Set di lavoro fatti e previsti di un esercizio («1 di 3»).
+    func setDiLavoro(di indice: Int) -> (fatti: Int, totale: Int) {
+        let lavoro = set[indice].filter { $0.kind != .approach }
+        return (lavoro.filter(\.isDone).count, lavoro.count)
+    }
+
+    /// Nuovo ordine dopo l'esercizio di adesso (da fare riordinati, poi rimandati).
+    func riordina(_ coda: [Int], alle ora: Date = .now) {
+        do {
+            try macchina.reorderUpcoming(coda)
+        } catch {
+            return
+        }
+        for (posizione, indice) in macchina.order.enumerated() {
+            esercizi[indice].position = posizione
+        }
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// «Fai dopo questo»: il rimandato torna tra i da fare, subito dopo l'esercizio di adesso.
+    func faiDopoQuesto(_ indice: Int, alle ora: Date = .now) {
+        esercizi[indice].isPostponed = false
+        rimandatiAlle[indice] = nil
+        riordina(scaletta.bringingForward(indice), alle: ora)
+    }
 
     /// «Concludi», o fine dell'ultimo set (quando si chiude il suo avviso). Il riepilogo arriva nella settimana 4: per ora la
     /// sessione si chiude e va nello storico così com'è.

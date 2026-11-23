@@ -11,6 +11,7 @@ struct SessioneView: View {
 
     @State private var chiediConclusione = false
     @State private var correzione: Correzione?
+    @State private var scalettaAperta = false
 
     /// Set fatto aperto in Correggi set.
     struct Correzione: Identifiable {
@@ -76,6 +77,9 @@ struct SessioneView: View {
         }
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .sheet(isPresented: $scalettaAperta) {
+            ScalettaView(sessione: sessione)
+        }
         .sheet(item: $correzione) { correzione in
             CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
         }
@@ -109,7 +113,7 @@ struct SessioneView: View {
             }
             .frame(maxWidth: .infinity)
             PulsanteTondo(icona: "list.bullet", etichetta: "Scaletta") {
-                // Scaletta: prossimo pezzo della settimana 3.
+                scalettaAperta = true
             }
             Button("Concludi") { chiediConclusione = true }
                 .font(.body.weight(.semibold))
