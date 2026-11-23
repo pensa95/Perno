@@ -19,16 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:5.10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test
         run: swift test --package-path Packages/PernoCore
 
   build-ios:
     name: Build .ipa (iOS)
-    runs-on: macos-15
+    runs-on: macos-26
     needs: test-linux
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Xcode in uso
         run: xcodebuild -version
