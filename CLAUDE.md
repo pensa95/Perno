@@ -40,6 +40,7 @@ Riscaldamento (dock arancio) → Cambio esercizio (grafite) → «Inizia» → 3
 
 - `Packages/PernoCore/` — logica pura in Swift (solo Foundation, deve compilare anche su Linux), con test XCTest. Tutta la logica che si può testare va qui, non nelle view.
 - `Perno/` — app SwiftUI (iOS 17+).
+- `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
 - `project.yml` — progetto XcodeGen; il `.xcodeproj` non si committa, lo genera la CI.
 - `.github/workflows/build.yml` — test su Linux e macOS, build `.ipa` non firmata, release scaricabile dal telefono.
 
