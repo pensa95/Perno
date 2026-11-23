@@ -30,6 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Seleziona Xcode 26
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          test -n "$X" || { echo "Xcode 26 non disponibile su questo runner"; exit 1; }
+          sudo xcode-select -s "$X"
+
       - name: Xcode in uso
         run: xcodebuild -version
 
