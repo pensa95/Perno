@@ -13,6 +13,9 @@ struct HomeView: View {
     @Query private var giorni: [PlanDay]
     @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
 
+    @Environment(\.modelContext) private var context
+    @State private var sessioneAperta: SessioneInCorso?
+
     private var calendario: Calendar { .current }
 
     // MARK: Dati
@@ -112,6 +115,16 @@ struct HomeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        .fullScreenCover(item: $sessioneAperta) { sessione in
+            SessioneView(sessione: sessione) { sessioneAperta = nil }
+        }
+    }
+
+    /// «Inizia …»: crea il registro dalla scheda e apre la schermata della sessione.
+    private func avvia(_ scheda: Routine) {
+        guard !scheda.entries.isEmpty else { return }
+        let sessione = WorkoutSession.avvia(da: scheda, in: context)
+        sessioneAperta = SessioneInCorso(sessione: sessione, context: context)
     }
 
     private var titoloOggi: String { "Oggi, \(Weekday.name(oggi).lowercased())" }
@@ -141,8 +154,8 @@ struct HomeView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.inchiostroTenue)
             }
-            PulsanteGiallo(titolo: "Inizia \(scheda.name)") {
-                // Settimana 3: avvio della sessione.
+            PulsanteGiallo(titolo: "Inizia \(scheda.name)", attivo: !scheda.entries.isEmpty) {
+                avvia(scheda)
             }
         }
         .padding(.top, 20)
@@ -219,7 +232,7 @@ struct HomeView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     PulsanteSecondario(titolo: "Inizia", altezza: 44, riempi: false) {
-                        // Settimana 3: avvio della sessione.
+                        avvia(scheda)
                     }
                 }
                 .vocePila()

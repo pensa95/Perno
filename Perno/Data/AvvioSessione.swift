@@ -5,7 +5,6 @@ import PernoCore
 extension WorkoutSession {
     /// Crea il registro di una sessione da una scheda: copia esercizi e parametri (la scheda non
     /// cambia) e prepara avvicinamenti e obiettivi dalla volta precedente (`SessionPlanner`).
-    /// La schermata della sessione arriva nel prossimo pezzo della settimana 3.
     @discardableResult
     static func avvia(da scheda: Routine, alle inizio: Date = .now, in context: ModelContext) -> WorkoutSession {
         let sessione = WorkoutSession(routine: scheda, startedAt: inizio)
