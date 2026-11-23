@@ -63,6 +63,14 @@ public struct Pause: Equatable, Sendable {
     public var start: Date
     public var end: Date
 
+    public init(kind: PauseKind, exerciseIndex: Int?, afterApproach: Bool, start: Date, end: Date) {
+        self.kind = kind
+        self.exerciseIndex = exerciseIndex
+        self.afterApproach = afterApproach
+        self.start = start
+        self.end = end
+    }
+
     public var duration: TimeInterval { end.timeIntervalSince(start) }
 }
 
@@ -212,5 +220,26 @@ public enum SessionStats {
         let rests = pauses.filter { $0.kind == .rest && !$0.afterApproach }.suffix(lastN)
         guard !rests.isEmpty else { return nil }
         return rests.reduce(0) { $0 + $1.duration } / Double(rests.count)
+    }
+}
+
+// MARK: - Annulla del 3-2-1
+
+extension SessionMachine {
+    /// «Annulla» durante il 3-2-1: si torna alla pausa di prima, che continua a contare dal suo inizio.
+    public mutating func cancelCountdown() throws {
+        guard case let .countdown(_, pauseStart, pauseKind) = phase else {
+            throw SessionError.invalidTransition
+        }
+        switch pauseKind {
+        case .rest: phase = .rest(since: pauseStart)
+        case .changeover: phase = .changeover(since: pauseStart)
+        case .warmUp: phase = .warmUp(since: pauseStart)
+        }
+    }
+
+    /// «Concludi»: la sessione finisce dove si trova; i set non fatti restano non fatti.
+    public mutating func finish() {
+        phase = .finished
     }
 }
