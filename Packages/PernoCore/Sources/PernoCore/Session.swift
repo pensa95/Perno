@@ -2,9 +2,12 @@ import Foundation
 
 // MARK: - Piano della sessione
 
-public enum SetKind: String, Codable, Sendable {
+/// Tipo di set. Il valore grezzo è quello salvato: non cambiarlo.
+public enum SetKind: String, CaseIterable, Codable, Sendable {
     case approach
     case work
+    case drop
+    case failure
 }
 
 public struct PlannedSet: Equatable, Sendable {
