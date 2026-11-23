@@ -16,6 +16,8 @@ struct SessioneView: View {
     @State private var correzione: Correzione?
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
+    @State private var scriviNota = false
+    @State private var testoNota = ""
 
     /// Set fatto aperto in Correggi set.
     struct Correzione: Identifiable {
@@ -210,9 +212,7 @@ struct SessioneView: View {
                 PulsanteTondo(icona: "chart.line.uptrend.xyaxis", etichetta: "Progressi") {
                     // Progressi: settimane 5–6.
                 }
-                PulsanteTondo(icona: "ellipsis", etichetta: "Altre azioni") {
-                    // Menu «…» (nota dell'esercizio): prossimi pezzi della settimana 3.
-                }
+                menuEsercizio(esercizio)
             }
             .padding(.top, 24)
 
@@ -233,12 +233,55 @@ struct SessioneView: View {
         }
     }
 
+    /// Menu «…» dell'esercizio: nota per questa sessione, + set, Rimanda.
+    private func menuEsercizio(_ esercizio: SessionExercise) -> some View {
+        Menu {
+            Button {
+                testoNota = esercizio.note
+                scriviNota = true
+            } label: {
+                Label(esercizio.note.isEmpty ? "Aggiungi nota" : "Modifica nota", systemImage: "text.bubble")
+            }
+            Button {
+                sessione.aggiungiSet()
+            } label: {
+                Label("Aggiungi set", systemImage: "plus")
+            }
+            .disabled(sessione.macchina.currentExerciseIndex == nil)
+            Button {
+                sessione.rimanda()
+            } label: {
+                Label("Rimanda", systemImage: "arrow.uturn.down")
+            }
+            .disabled(!sessione.puoRimandare)
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.inchiostro)
+                .frame(width: 44, height: 44)
+                .background(Color.foglio, in: Circle())
+        }
+        .accessibilityLabel("Altre azioni")
+        .alert(esercizio.name, isPresented: $scriviNota) {
+            TextField("Nota per oggi", text: $testoNota)
+            Button("Annulla", role: .cancel) {}
+            Button("Salva") {
+                if let indice = sessione.indiceEsercizio {
+                    sessione.salvaNota(testoNota, esercizio: indice)
+                }
+            }
+        } message: {
+            Text("Vale solo per questa sessione.")
+        }
+    }
+
     /// Card bianca: regolazioni (più grandi durante il cambio esercizio) e promemoria.
     @ViewBuilder
     private func regolazioni(_ esercizio: SessionExercise) -> some View {
         let setup = esercizio.setup.trimmingCharacters(in: .whitespacesAndNewlines)
         let promemoria = Cues.split(esercizio.cues)
-        if !setup.isEmpty || !promemoria.isEmpty {
+        let nota = esercizio.note
+        if !setup.isEmpty || !promemoria.isEmpty || !nota.isEmpty {
             let inEvidenza: Bool = {
                 if case .changeover = sessione.fase { return true }
                 return false
@@ -263,6 +306,17 @@ struct SessioneView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .foregroundStyle(Color.inchiostroTenue)
+                }
+                if !nota.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(nota)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(Color.inchiostroTenue)
+                    .accessibilityLabel("Nota di oggi: \(nota)")
                 }
             }
             .padding(inEvidenza ? 16 : 12)

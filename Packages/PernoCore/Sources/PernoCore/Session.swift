@@ -519,3 +519,19 @@ extension SessionMachine {
         }
     }
 }
+
+// MARK: - Menu «…» dell'esercizio
+
+extension SessionMachine {
+    /// «+ set»: un set di lavoro in più in fondo all'esercizio, con l'obiettivo dell'ultimo set di
+    /// lavoro (o, senza set di lavoro, dell'ultimo set). Restituisce l'indice del set nuovo.
+    @discardableResult
+    public mutating func addSet(toExercise exercise: Int) throws -> Int {
+        guard exercises.indices.contains(exercise) else { throw SessionError.invalidTransition }
+        let sets = exercises[exercise].sets
+        let model = sets.last { $0.kind != .approach } ?? sets.last
+        exercises[exercise].sets.append(PlannedSet(kind: .work, weight: model?.weight ?? 0,
+                                                   reps: model?.reps ?? FreeSessionText.addedRepsMin))
+        return exercises[exercise].sets.count - 1
+    }
+}
