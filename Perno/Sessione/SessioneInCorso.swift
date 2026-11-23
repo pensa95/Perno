@@ -359,6 +359,29 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
+    // MARK: Menu «…» dell'esercizio
+
+    /// «Aggiungi set»: un set di lavoro in più in fondo all'esercizio di adesso.
+    func aggiungiSet(alle ora: Date = .now) {
+        guard let indice = macchina.currentExerciseIndex,
+              let nuovo = try? macchina.addSet(toExercise: indice) else { return }
+        let piano = macchina.exercises[indice].sets[nuovo]
+        let registrato = SessionSet(position: nuovo, kind: piano.kind,
+                                    targetWeight: piano.weight, targetReps: piano.reps)
+        context.insert(registrato)
+        registrato.sessionExercise = esercizi[indice]
+        set[indice].append(registrato)
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// Nota dell'esercizio per questa sessione.
+    func salvaNota(_ testo: String, esercizio indice: Int, alle ora: Date = .now) {
+        esercizi[indice].note = testo.trimmingCharacters(in: .whitespacesAndNewlines)
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
     // MARK: Scaletta
 
     var scaletta: Lineup {

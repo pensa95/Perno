@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import PernoCore
 
 /// Le tre sezioni dell'app (Allenati, Schede, Storico).
 enum Sezione: CaseIterable {
@@ -29,9 +31,14 @@ enum Sezione: CaseIterable {
 /// sulle altre sezioni.
 struct SezioniView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
+    @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
     @State private var sezione: Sezione = .allenati
     @State private var sessione: SessioneInCorso?
     @State private var schermoSessione = false
+    /// Riepiloghi già chiusi in questa apertura (prima di eliminare la sessione, così nessuna vista
+    /// legge una sessione già eliminata).
+    @State private var riepiloghiChiusi: Set<UUID> = []
 
     var body: some View {
         TabView(selection: $sezione) {
@@ -55,6 +62,27 @@ struct SezioniView: View {
                 .tag(Sezione.storico)
         }
         .tint(Color.inchiostro)
+        .background {
+            Color.clear
+                .fullScreenCover(item: Binding(get: { daRivedere }, set: { _ in })) { registro in
+                    RiepilogoChiusaView(sessione: registro,
+                                        salva: {
+                                            registro.isSaved = true
+                                            try? context.save()
+                                        },
+                                        elimina: {
+                                            riepiloghiChiusi.insert(registro.id)
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                                context.delete(registro)
+                                                try? context.save()
+                                            }
+                                        })
+                }
+        }
+        .onAppear(perform: chiudiInattive)
+        .onChange(of: scenePhase) { _, fase in
+            if fase == .active { chiudiInattive() }
+        }
         .fullScreenCover(isPresented: $schermoSessione) {
             if let sessione {
                 SessioneView(sessione: sessione,
@@ -65,6 +93,34 @@ struct SezioniView: View {
                              })
             }
         }
+    }
+
+    /// Sessione chiusa da sola, non ancora salvata: alla riapertura si vede il suo riepilogo.
+    private var daRivedere: WorkoutSession? {
+        guard !schermoSessione else { return nil }
+        return sessioni.last {
+            $0.closedAutomatically && !$0.isSaved && $0.endedAt != nil && !riepiloghiChiusi.contains($0.id)
+        }
+    }
+
+    /// Chiusura automatica: dopo 3 ore senza attività la sessione (aperta o interrotta) si chiude
+    /// all'ultimo «Set fatto».
+    private func chiudiInattive() {
+        let ora = Date.now
+        if let viva = sessione, AutoClose.isDue(lastActivity: viva.sessione.lastActivityAt, now: ora) {
+            schermoSessione = false
+            sessione = nil
+        }
+        var chiuse = false
+        for registro in sessioni where registro.endedAt == nil
+            && AutoClose.isDue(lastActivity: registro.lastActivityAt, now: ora) {
+            let ultimoSet = registro.exercises.flatMap(\.sets).compactMap(\.endedAt).max()
+            registro.endedAt = AutoClose.end(lastSetEnd: ultimoSet, lastActivity: registro.lastActivityAt)
+            registro.closedAutomatically = true
+            registro.isSaved = false
+            chiuse = true
+        }
+        if chiuse { try? context.save() }
     }
 
     @ViewBuilder
