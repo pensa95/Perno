@@ -1,0 +1,45 @@
+import Foundation
+import SwiftData
+import PernoCore
+
+extension WorkoutSession {
+    /// Crea il registro di una sessione da una scheda: copia esercizi e parametri (la scheda non
+    /// cambia) e prepara avvicinamenti e obiettivi dalla volta precedente (`SessionPlanner`).
+    /// La schermata della sessione arriva nel prossimo pezzo della settimana 3.
+    @discardableResult
+    static func avvia(da scheda: Routine, alle inizio: Date = .now, in context: ModelContext) -> WorkoutSession {
+        let sessione = WorkoutSession(routine: scheda, startedAt: inizio)
+        context.insert(sessione)
+        for (indice, voce) in scheda.orderedEntries.enumerated() {
+            let esercizio = SessionExercise(position: indice, entry: voce)
+            context.insert(esercizio)
+            esercizio.session = sessione
+            let piano = SessionPlanner.plan(
+                workSets: voce.setCount,
+                repsMin: voce.repsMin,
+                approaches: voce.approachCount,
+                previous: voce.exercise.map(ultimiSetDiLavoro) ?? [],
+                step: PlateStep.standard
+            )
+            for (posizione, set) in piano.enumerated() {
+                let registrato = SessionSet(position: posizione, kind: set.kind,
+                                            targetWeight: set.weight, targetReps: set.reps)
+                context.insert(registrato)
+                registrato.sessionExercise = esercizio
+            }
+        }
+        try? context.save()
+        return sessione
+    }
+
+    /// Set di lavoro fatti l'ultima volta per questo esercizio, in ordine (avvicinamenti esclusi).
+    static func ultimiSetDiLavoro(_ esercizio: Exercise) -> [(weight: Double, reps: Int)] {
+        let ultima = esercizio.sessionExercises
+            .filter { $0.session?.endedAt != nil }
+            .max { ($0.session?.startedAt ?? .distantPast) < ($1.session?.startedAt ?? .distantPast) }
+        return (ultima?.orderedSets ?? []).compactMap { set -> (weight: Double, reps: Int)? in
+            guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
+            return (weight, reps)
+        }
+    }
+}
