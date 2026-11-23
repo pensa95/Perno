@@ -70,7 +70,7 @@ struct LibreriaView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
-            .padding(.bottom, 32)
+            .padding(.bottom, 120) // spazio per la barra delle sezioni
         }
         .scrollDismissesKeyboard(.immediately)
         .background(Color.lamiera)

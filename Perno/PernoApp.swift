@@ -15,7 +15,8 @@ struct PernoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            BenvenutoView()
+            // Il primo avvio (Benvenuto, cartella dei backup) arriva nella settimana 4.
+            SezioniView()
         }
         .modelContainer(container)
     }
