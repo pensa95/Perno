@@ -16,3 +16,6 @@ Payload/
 
 # Sistema
 .DS_Store
+
+# Generato da XcodeGen
+Support/Info.plist
