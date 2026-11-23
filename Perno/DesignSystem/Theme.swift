@@ -39,8 +39,9 @@ extension UIColor {
 }
 
 extension Font {
-    /// Numeri e titoli. Barlow Condensed quando sarà inclusa; per ora il system font condensed.
-    static func piastra(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .semibold).width(.condensed)
+    /// Numeri e titoli in Barlow Condensed (OFL, file in `Perno/Resources/Fonts`, registrati con
+    /// `UIAppFonts`). Semibold di default, come nelle tavole; `.medium` per i pesi 500.
+    static func piastra(_ size: CGFloat, peso: Font.Weight = .semibold) -> Font {
+        .custom(peso == .medium ? "BarlowCondensed-Medium" : "BarlowCondensed-SemiBold", fixedSize: size)
     }
 }
