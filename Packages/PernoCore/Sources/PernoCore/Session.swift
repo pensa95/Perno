@@ -46,6 +46,17 @@ public struct CompletedSet: Equatable, Sendable {
     public var endedAt: Date
 
     public var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
+
+    public init(exerciseIndex: Int, setIndex: Int, kind: SetKind, weight: Double, reps: Int,
+                startedAt: Date, endedAt: Date) {
+        self.exerciseIndex = exerciseIndex
+        self.setIndex = setIndex
+        self.kind = kind
+        self.weight = weight
+        self.reps = reps
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+    }
 }
 
 public enum PauseKind: String, Codable, Sendable {
@@ -433,19 +444,6 @@ extension SessionMachine {
 }
 
 // MARK: - Ripresa dopo un'interruzione
-
-extension CompletedSet {
-    public init(exerciseIndex: Int, setIndex: Int, kind: SetKind, weight: Double, reps: Int,
-                startedAt: Date, endedAt: Date) {
-        self.exerciseIndex = exerciseIndex
-        self.setIndex = setIndex
-        self.kind = kind
-        self.weight = weight
-        self.reps = reps
-        self.startedAt = startedAt
-        self.endedAt = endedAt
-    }
-}
 
 extension SessionMachine {
     /// Ripresa: riparte dal set dopo l'ultimo «Set fatto». Se l'esercizio ha ancora set, il recupero
