@@ -30,10 +30,33 @@ struct Pila<Content: View>: View {
     }
 }
 
-/// Voce della pila con titolo, sottotitolo opzionale e freccia.
+extension View {
+    /// Fondo di una voce della pila: foglio, raggio 8, alta almeno `altezza` pt.
+    func vocePila(altezza: CGFloat = 60) -> some View {
+        self
+            .padding(.vertical, 8)
+            .padding(.leading, 16)
+            .padding(.trailing, 12)
+            .frame(maxWidth: .infinity, minHeight: altezza)
+            .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// Freccia a destra delle voci che aprono qualcosa.
+struct FrecciaVoce: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Color.inchiostroTenue)
+    }
+}
+
+/// Voce della pila con titolo, sottotitolo opzionale, dettaglio a destra opzionale e freccia.
 struct VocePila: View {
     let titolo: String
     var sottotitolo: String? = nil
+    var dettaglio: String? = nil
     var freccia = true
 
     var body: some View {
@@ -49,18 +72,56 @@ struct VocePila: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if freccia {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .semibold))
+            if let dettaglio {
+                Text(dettaglio)
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(Color.inchiostroTenue)
             }
+            if freccia {
+                FrecciaVoce()
+            }
         }
-        .padding(.vertical, 8)
-        .padding(.leading, 16)
-        .padding(.trailing, 12)
-        .frame(minHeight: 60)
-        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .vocePila()
+    }
+}
+
+/// Voce di scelta nei fogli (una sola scelta): titolo, sottotitolo e cerchio a destra.
+struct VoceScelta: View {
+    let titolo: String
+    var sottotitolo: String? = nil
+    let scelta: Bool
+    let azione: () -> Void
+
+    var body: some View {
+        Button(action: azione) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(titolo)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                    if let sottotitolo {
+                        Text(sottotitolo)
+                            .font(.footnote)
+                            .foregroundStyle(Color.inchiostroTenue)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                ZStack {
+                    if scelta {
+                        Circle().fill(Color.inchiostro)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.foglio)
+                    } else {
+                        Circle().strokeBorder(Color.linea, lineWidth: 2)
+                    }
+                }
+                .frame(width: 26, height: 26)
+            }
+            .vocePila(altezza: 64)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(scelta ? .isSelected : [])
     }
 }
 
@@ -69,13 +130,20 @@ struct VocePila: View {
 /// Pulsante principale giallo (uno solo per schermata), alto 64 pt.
 struct PulsanteGiallo: View {
     let titolo: String
+    var icona: String? = nil
     var attivo = true
     let azione: () -> Void
 
     var body: some View {
         Button(action: azione) {
-            Text(titolo)
-                .font(.system(size: 19, weight: .semibold))
+            HStack(spacing: 8) {
+                if let icona {
+                    Image(systemName: icona)
+                        .font(.system(size: 19, weight: .semibold))
+                }
+                Text(titolo)
+                    .font(.system(size: 19, weight: .semibold))
+            }
                 .foregroundStyle(Color.suPerno)
                 .frame(maxWidth: .infinity, minHeight: 64)
                 .background(Color.perno, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -198,9 +266,17 @@ struct Foglio<Content: View>: View {
         .padding(.top, 24)
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
-        .background(Color.lamiera)
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(28)
-        .presentationBackground(Color.lamiera)
+        .stileFoglio()
+    }
+}
+
+extension View {
+    /// Aspetto comune dei fogli: fondo lamiera, raggio 28, maniglia visibile.
+    func stileFoglio() -> some View {
+        self
+            .background(Color.lamiera)
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+            .presentationBackground(Color.lamiera)
     }
 }
