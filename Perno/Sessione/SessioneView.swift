@@ -18,6 +18,7 @@ struct SessioneView: View {
     /// Progressi: dettaglio dell'esercizio di adesso, in un foglio.
     @State private var progressi: Exercise?
     @Environment(\.colorScheme) private var schema
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
     @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
@@ -41,13 +42,14 @@ struct SessioneView: View {
                               completa: { esercizio in sessione.completa(esercizio) },
                               salva: { sessione.salva() },
                               elimina: elimina)
-                    .transition(.move(edge: .trailing))
+                    .transition(menoMovimento ? .opacity : .move(edge: .trailing))
             } else {
                 schermata
-                    .transition(.move(edge: .leading))
+                    .transition(menoMovimento ? .opacity : .move(edge: .leading))
             }
         }
         .animation(.easeInOut(duration: 0.3), value: sessione.riepilogoAperto)
+        .onChange(of: sessione.fase) { _, fase in annunciaFase(fase) }
         .onChange(of: sessione.conclusa) { _, conclusa in
             if conclusa { chiudi() }
         }
@@ -124,6 +126,9 @@ struct SessioneView: View {
             }
             guard !Task.isCancelled else { return }
             await segnaliFinoA(fine, durata: 3, vibraAllaFine: true)
+            if !Task.isCancelled, fine.timeIntervalSinceNow <= 0 {
+                Annuncio.voiceOver("Recupero finito")
+            }
         }
         .task(id: fineRecuperoAutomatica) {
             // «Parti da solo a fine recupero»: a zero del conto alla rovescia parte il 3-2-1.
@@ -198,6 +203,32 @@ struct SessioneView: View {
                 Segnali.shared.vibraVia()
             }
         }
+    }
+
+    /// VoiceOver: annuncia la fase nuova (chi non guarda lo schermo sentiva solo i bip).
+    private func annunciaFase(_ fase: SessionPhase) {
+        let tipo = sessione.setCorrente?.kind ?? .work
+        let numero = sessione.numeroSetCorrente
+        let testo: String
+        switch fase {
+        case .warmUp:
+            testo = "Riscaldamento in corso"
+        case .changeover:
+            if let indice = sessione.indiceEsercizio, indice < sessione.esercizi.count {
+                testo = "Cambio esercizio. Prossimo: \(sessione.esercizi[indice].name)"
+            } else {
+                testo = "Cambio esercizio"
+            }
+        case .countdown:
+            testo = "\(SessionText.countdownTitle(tipo, numero)) \(sessione.secondiContoAllaRovescia) secondi"
+        case .inSet:
+            testo = SessionText.inProgress(tipo, numero)
+        case .rest:
+            testo = "Recupero"
+        case .finished:
+            testo = "Tutti i set fatti"
+        }
+        Annuncio.voiceOver(testo)
     }
 
     private var inizioContoAllaRovescia: Date? {

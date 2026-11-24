@@ -145,7 +145,7 @@ struct EditorSchedaView: View {
         HStack(spacing: 10) {
             Image(systemName: "equal")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.piastraTenue)
+                .foregroundStyle(Color.iconaTenue)
                 .frame(width: 28)
                 .accessibilityHidden(true)
             Text("\(numero)")
