@@ -56,13 +56,15 @@ struct SessioneView: View {
     }
 
     private var schermata: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
-            let ora = contesto.date
-            ZStack {
+        // Solo i tempi (testata, dock, 3-2-1) si aggiornano ogni mezzo secondo: il resto della
+        // schermata si ridisegna solo quando cambia la sessione.
+        ZStack {
                 VStack(spacing: 0) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
-                            testata(ora: ora)
+                            TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
+                                testata(ora: contesto.date)
+                            }
                             if case .warmUp = sessione.fase {
                                 riscaldamento
                             } else if sessione.daScegliere {
@@ -76,7 +78,9 @@ struct SessioneView: View {
                         .padding(.bottom, 16)
                     }
                     .scrollBounceBehavior(.basedOnSize)
-                    dock(ora: ora)
+                    TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
+                        dock(ora: contesto.date)
+                    }
                 }
                 .ignoresSafeArea(edges: .bottom)
 
@@ -85,9 +89,10 @@ struct SessioneView: View {
                 }
 
                 if case let .countdown(dal, _, _) = sessione.fase {
-                    contoAllaRovescia(trascorsi: ora.timeIntervalSince(dal))
+                    TimelineView(.periodic(from: .now, by: 0.25)) { contesto in
+                        contoAllaRovescia(trascorsi: contesto.date.timeIntervalSince(dal))
+                    }
                 }
-            }
         }
         .background(Color.lamiera.ignoresSafeArea())
         .task(id: inizioContoAllaRovescia) {

@@ -42,8 +42,8 @@ struct DettaglioEsercizioView: View {
     }
 
     var body: some View {
-        let storico = esercizio.storico
         let volte = esercizio.volteNelloStorico
+        let storico = esercizio.storico(da: volte)
         let record = ExerciseDetail.recordDates(storico)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -354,7 +354,7 @@ struct SessioniEsercizioView: View {
 
     var body: some View {
         let volte = esercizio.volteNelloStorico
-        let record = ExerciseDetail.recordDates(esercizio.storico)
+        let record = ExerciseDetail.recordDates(esercizio.storico(da: volte))
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 PulsanteIndietro(titolo: indietro) { dismiss() }

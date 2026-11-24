@@ -138,10 +138,14 @@ struct HomeView: View {
     }
 
     /// «Annulla sessione» sulla card di oggi fatto: elimina la sessione (set e pause compresi).
+    /// Il dialogo si chiude prima, poi la sessione si elimina (così nessuna vista legge una
+    /// sessione già eliminata, come per il riepilogo e il dettaglio).
     private func annulla(_ sessione: WorkoutSession) {
-        context.delete(sessione)
-        try? context.save()
         sessioneDaAnnullare = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            context.delete(sessione)
+            try? context.save()
+        }
     }
 
     private var titoloOggi: String { "Oggi, \(Weekday.name(oggi).lowercased())" }

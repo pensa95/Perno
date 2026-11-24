@@ -46,14 +46,7 @@ struct EsercizioSchedaView: View {
     }
 
     /// Recupero abituale dai recuperi registrati per questo esercizio (esclusi avvicinamenti e cambi).
-    private var recuperoAbituale: Double? {
-        let durate = (esercizio?.sessionExercises ?? [])
-            .flatMap(\.pauses)
-            .filter { $0.kind == .rest && !$0.afterApproach }
-            .sorted { $0.start < $1.start }
-            .map(\.duration)
-        return SessionStats.usualRest(restDurations: durate)
-    }
+    private var recuperoAbituale: Double? { esercizio?.recuperoAbituale }
 
     var body: some View {
         Foglio(titolo: esercizio?.name ?? "Esercizio", sottotitolo: sottotitolo, pulsante: "Salva",
