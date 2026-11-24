@@ -89,7 +89,7 @@ struct SessioneView: View {
                 }
 
                 if case let .countdown(dal, _, _) = sessione.fase {
-                    TimelineView(.periodic(from: .now, by: 0.25)) { contesto in
+                    TimelineView(.animation(minimumInterval: 1.0 / 30)) { contesto in
                         contoAllaRovescia(trascorsi: contesto.date.timeIntervalSince(dal))
                     }
                 }
@@ -103,22 +103,27 @@ struct SessioneView: View {
                 try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
             }
             guard !Task.isCancelled else { return }
-            Segnali.shared.via()
+            Segnali.shared.vibraVia()
             sessione.contoAllaRovesciaFinito(alle: fine)
         }
         .task(id: inizioContoAllaRovescia) {
-            // Bip e vibrazione a ogni secondo degli ultimi 3 del 3-2-1 («via» quando finisce).
+            // Bip degli ultimi 3 secondi del 3-2-1 e «via»: tutti in coda subito, così suonano anche
+            // se lo schermo si blocca. Le vibrazioni seguono a ogni secondo (solo in primo piano).
             guard let dal = inizioContoAllaRovescia else { return }
             let totale = sessione.secondiContoAllaRovescia
-            for passo in 0..<totale where totale - passo <= 3 {
-                let attesa = dal.addingTimeInterval(TimeInterval(passo)).timeIntervalSinceNow
-                if attesa < -0.5 { continue }
-                if attesa > 0 {
-                    try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
-                }
-                guard !Task.isCancelled else { return }
-                Segnali.shared.secondo()
+            let fine = dal.addingTimeInterval(TimeInterval(totale))
+            await segnaliFinoA(fine, durata: totale)
+        }
+        .task(id: fineRecuperoConBip) {
+            // Ultimi 3 secondi del recupero alla rovescia: bip e vibrazione come nel 3-2-1, con l'app
+            // in primo piano (a schermo bloccato c'è la notifica «Recupero finito»).
+            guard let fine = fineRecuperoConBip else { return }
+            let anticipo = fine.timeIntervalSinceNow - 3.5
+            if anticipo > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(anticipo * 1_000_000_000))
             }
+            guard !Task.isCancelled else { return }
+            await segnaliFinoA(fine, durata: 3, vibraAllaFine: true)
         }
         .task(id: fineRecuperoAutomatica) {
             // «Parti da solo a fine recupero»: a zero del conto alla rovescia parte il 3-2-1.
@@ -161,6 +166,38 @@ struct SessioneView: View {
         guard partiDaSolo, sessione.modoRecupero == .countdown, case let .rest(dal) = sessione.fase,
               sessione.setCorrente != nil else { return nil }
         return dal.addingTimeInterval(sessione.durataRecupero)
+    }
+
+    /// Fine del recupero alla rovescia che non parte da solo (se parte da solo, suona il 3-2-1).
+    private var fineRecuperoConBip: Date? {
+        guard sessione.modoRecupero == .countdown, case let .rest(dal) = sessione.fase,
+              sessione.setCorrente != nil, fineRecuperoAutomatica == nil else { return nil }
+        return dal.addingTimeInterval(sessione.durataRecupero)
+    }
+
+    /// Mette in coda i bip fino a `fine` e vibra a ogni secondo (`vibraAllaFine`: anche la vibrazione
+    /// forte allo zero). Se il compito viene annullato prima dello zero (3-2-1 annullato, +15 s,
+    /// set iniziato prima) ferma i bip rimasti; dopo lo zero il «via» finisce di suonare.
+    private func segnaliFinoA(_ fine: Date, durata: Int, vibraAllaFine: Bool = false) async {
+        guard fine.timeIntervalSinceNow > 0 else { return }
+        let istanti = Segnali.ultimiTre(prima: fine, durata: durata)
+        Segnali.shared.sequenza(bip: istanti, via: fine)
+        for istante in istanti + [fine] {
+            let attesa = istante.timeIntervalSinceNow
+            if attesa < -0.5 { continue }
+            if attesa > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
+            }
+            guard !Task.isCancelled else {
+                if fine.timeIntervalSinceNow > 0.05 { Segnali.shared.ferma(via: fine) }
+                return
+            }
+            if istante != fine {
+                Segnali.shared.vibraSecondo()
+            } else if vibraAllaFine {
+                Segnali.shared.vibraVia()
+            }
+        }
     }
 
     private var inizioContoAllaRovescia: Date? {
@@ -597,17 +634,28 @@ struct SessioneView: View {
 
     // MARK: 3-2-1
 
+    /// Anello sottile che si svuota nel tempo del 3-2-1, numero bianco al centro
+    /// (al posto del cerchio giallo pieno: scelta dell'utente del 24/11, alternativa A).
     private func contoAllaRovescia(trascorsi: TimeInterval) -> some View {
-        VStack(spacing: 16) {
+        let totale = Double(max(1, sessione.secondiContoAllaRovescia))
+        let restante = min(1, max(0, 1 - trascorsi / totale))
+        return VStack(spacing: 16) {
             Text(setCorrente(SessionText.countdownTitle))
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.piastraTenue)
             Text("\(SessionText.countdownValue(elapsed: trascorsi, total: sessione.secondiContoAllaRovescia))")
                 .font(.piastra(140))
                 .monospacedDigit()
-                .foregroundStyle(Color.suPerno)
+                .foregroundStyle(.white)
                 .frame(width: 200, height: 200)
-                .background(Color.perno, in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(0.14), lineWidth: 5)
+                    Circle()
+                        .trim(from: 0, to: restante)
+                        .stroke(Color.perno, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
             Button {
                 sessione.annullaContoAllaRovescia()
             } label: {

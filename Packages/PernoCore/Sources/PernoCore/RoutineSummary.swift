@@ -25,8 +25,8 @@ public enum RoutineSummary {
     }
 
     // Tempi della stima, finché non ci sono dati misurati.
-    public static let workSet: Double = 45
-    public static let approachSet: Double = 30
+    public static let workSet: Double = 60
+    public static let approachSet: Double = 45
     public static let approachRest: Double = 60
     public static let defaultRest: Double = 120
     public static let changeover: Double = 90

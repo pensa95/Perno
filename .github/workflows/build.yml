@@ -73,6 +73,7 @@ jobs:
           EXT="$APP/PlugIns/PernoWidget.appex"
           test -d "$EXT" || { echo "Manca PernoWidget.appex in PlugIns"; exit 1; }
           plutil -extract NSSupportsLiveActivities raw -o - "$APP/Info.plist"
+          plutil -extract UIBackgroundModes json -o - "$APP/Info.plist" | grep -q '"audio"' || { echo "Manca UIBackgroundModes audio (bip a schermo bloccato)"; exit 1; }
           plutil -extract NSExtension.NSExtensionPointIdentifier raw -o - "$EXT/Info.plist"
           for f in BarlowCondensed-Medium.ttf BarlowCondensed-SemiBold.ttf; do
             test -f "$EXT/$f" || { echo "Manca $f nell'estensione"; exit 1; }
