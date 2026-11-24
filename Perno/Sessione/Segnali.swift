@@ -4,7 +4,8 @@ import UIKit
 /// Bip e vibrazione del 3-2-1 («Prima di ogni set» nelle Impostazioni).
 /// Il bip si sente sopra la musica, che si abbassa un attimo (audio session con ducking) e poi
 /// torna al suo volume. Il suono è un tono generato al momento: nessun file audio nell'app.
-/// Con l'app in background o lo schermo bloccato il 3-2-1 non gira, quindi niente segnali.
+/// Con lo schermo bloccato il 3-2-1 partito dalla Live Activity lo porta a termine l'azione del pulsante
+/// (`AttivitaLive`): se i bip si sentono anche lì è da verificare sul telefono.
 @MainActor
 final class Segnali {
     static let shared = Segnali()

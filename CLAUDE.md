@@ -15,7 +15,7 @@ App iOS nativa (Swift/SwiftUI) per registrare gli allenamenti in palestra. Offli
 
 Nel progetto claude.ai «App palestra» (documenti `claude/…`):
 - `funzionalita-v1.md` — cosa fa l'app (fonte per il codice).
-- `schermate-ui-v3.md` — tavole della UI v3, **fonte di verità**: canvas principale https://claude.ai/artifact/HntdoTozYWGBsHUDUSmqxE e schermate aggiunte https://claude.ai/artifact/NX6zmfJ2fvqDYuaXLEYFxR.
+- `schermate-ui-v4.md` — tavole della UI v4, **fonte di verità**: canvas https://claude.ai/artifact/Rya7xFNT3KLuxohPYqGBUV e canvas della Live Activity https://claude.ai/artifact/WkBgjgJLNDqgeCn7muwaDd (regole in `live-activity-v1.md`). La UI v3 è superata.
 - `piano-sviluppo.md` — calendario a settimane e regole per il piano Pro.
 - `identity-v1.md` — nome Perno, marchio, icona.
 
@@ -40,6 +40,7 @@ Riscaldamento (dock arancio) → Cambio esercizio (grafite) → «Inizia» → 3
 
 - `Packages/PernoCore/` — logica pura in Swift (solo Foundation, deve compilare anche su Linux), con test XCTest. Tutta la logica che si può testare va qui, non nelle view.
 - `Perno/` — app SwiftUI (iOS 17+).
+- `PernoWidget/` — estensione WidgetKit con la Live Activity della sessione (blocco schermo e Dynamic Island). `Shared/` è compilato nell'app e nell'estensione (attributi e pulsanti, `LiveActivityIntent`); i testi della card li prepara `LiveActivityText` in `PernoCore`.
 - `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
 - `project.yml` — progetto XcodeGen; il `.xcodeproj` non si committa, lo genera la CI.
 - `.github/workflows/build.yml` — test su Linux e macOS, build `.ipa` non firmata, release scaricabile dal telefono.

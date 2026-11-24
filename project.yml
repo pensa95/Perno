@@ -22,8 +22,11 @@ targets:
     platform: iOS
     sources:
       - path: Perno
+      - path: Shared
     dependencies:
       - package: PernoCore
+      - target: PernoWidget
+        embed: true
     info:
       path: Support/Info.plist
       properties:
@@ -33,6 +36,11 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.pensa95.perno
+            CFBundleURLSchemes:
+              - perno
         UIAppFonts:
           - BarlowCondensed-Medium.ttf
           - BarlowCondensed-SemiBold.ttf
@@ -45,3 +53,35 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
     scheme: {}
+
+  # Live Activity della sessione (blocco schermo e Dynamic Island).
+  PernoWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: PernoWidget
+      - path: Shared
+      - path: Perno/DesignSystem/Theme.swift
+      - path: Perno/Resources/Fonts
+        buildPhase: resources
+    dependencies:
+      - package: PernoCore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: Support/PernoWidget-Info.plist
+      properties:
+        CFBundleDisplayName: Perno
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        UIAppFonts:
+          - BarlowCondensed-Medium.ttf
+          - BarlowCondensed-SemiBold.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pensa95.perno.widget
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""

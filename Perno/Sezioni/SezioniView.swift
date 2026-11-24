@@ -144,6 +144,11 @@ struct SezioniView: View {
         .onChange(of: scenePhase) { _, fase in
             if fase == .active { chiudiInattive() }
         }
+        .background { OsservatoreAttivitaLive(sessione: sessione) }
+        .onOpenURL { indirizzo in
+            // Tocco sulla Live Activity, «Scegli esercizi», «Vai al riepilogo»: si apre la sessione.
+            if indirizzo == IndirizziPerno.sessione, sessione != nil { schermoSessione = true }
+        }
         .fullScreenCover(isPresented: $schermoSessione) {
             if let sessione {
                 SessioneView(sessione: sessione,
