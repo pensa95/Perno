@@ -29,6 +29,8 @@ extension Color {
     static let bordoOggi = Color.token(light: 0x2A3136, dark: 0xEEF1F3)
     static let bordoProgramma = Color.token(light: 0xA9B3BA, dark: 0x5A646B)
     static let bordoSaltato = Color.token(light: 0x2A3136, dark: 0x9AA5AD)
+    /// Voce scelta del selettore a segmenti: più chiara del fondo (piastra fatta) in tutti e due i temi.
+    static let segmentoScelto = Color.token(light: 0xFFFFFF, dark: 0x353E45)
     static let puntoRiposo = Color.token(light: 0xA9B3BA, dark: 0x9AA5AD)
 
     static func token(light: UInt32, dark: UInt32) -> Color {

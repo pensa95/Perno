@@ -366,11 +366,14 @@ struct StepperPiastra: View {
 
 // MARK: - Segmenti
 
-/// Selettore a segmenti: fondo piastra fatta, voce scelta su foglio con ombra leggera.
+/// Selettore a segmenti: fondo piastra fatta, voce scelta su una pillola (foglio nel chiaro, piastra nello
+/// scuro, così resta più chiara del fondo) con ombra leggera. La pillola scorre da una voce all'altra.
 struct SelettoreSegmenti<Valore: Hashable>: View {
     let valori: [Valore]
     @Binding var selezione: Valore
     let etichetta: (Valore) -> String
+    @Namespace private var spazio
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
     var body: some View {
         HStack(spacing: 2) {
@@ -381,13 +384,14 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
                 } label: {
                     Text(etichetta(valore))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.inchiostro)
+                        .foregroundStyle(scelto ? Color.inchiostro : Color.inchiostroTenue)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background {
                             if scelto {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.foglio)
+                                    .fill(Color.segmentoScelto)
                                     .shadow(color: Color.ombra.opacity(0.12), radius: 1.5, y: 1)
+                                    .matchedGeometryEffect(id: "pillola", in: spazio)
                             }
                         }
                         .contentShape(Rectangle())
@@ -398,6 +402,7 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
         }
         .padding(2)
         .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .animation(menoMovimento ? nil : .snappy(duration: 0.28), value: selezione)
     }
 }
 
