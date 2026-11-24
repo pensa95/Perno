@@ -19,14 +19,18 @@ struct PiastraSet: View {
     let stato: Stato
 
     var body: some View {
-        switch stato {
-        case let .adesso(etichetta, evidenza, nota):
-            adesso(etichetta: etichetta, evidenza: evidenza, nota: nota)
-        case let .fatta(nota):
-            riga(fatta: true, nota: nota)
-        case .daFare:
-            riga(fatta: false, nota: "obiettivo")
+        Group {
+            switch stato {
+            case let .adesso(etichetta, evidenza, nota):
+                adesso(etichetta: etichetta, evidenza: evidenza, nota: nota)
+            case let .fatta(nota):
+                riga(fatta: true, nota: nota)
+            case .daFare:
+                riga(fatta: false, nota: "obiettivo")
+            }
         }
+        // Piastre ad altezza fissa (88 e 44 pt, come nelle tavole): il testo cresce fino a xxxLarge.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func adesso(etichetta: String, evidenza: String?, nota: String?) -> some View {
@@ -85,13 +89,15 @@ struct PiastraSet: View {
             Text(nome)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
-                .frame(width: 52, alignment: .leading)
+                .frame(minWidth: 52, alignment: .leading)
                 .lineLimit(1)
+                .fixedSize()
             Text(valore)
                 .font(.piastra(26, peso: fatta ? .semibold : .medium))
                 .monospacedDigit()
                 .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
             if let nota {
                 Text(nota)
@@ -145,6 +151,10 @@ struct DockSessione: View {
     /// Tocco sul tempo (recupero: cronometro ↔ conto alla rovescia), con l'icona accanto.
     var azioneTempo: (() -> Void)? = nil
 
+    /// Pulsante principale: 19 e 15 pt come nelle tavole, che crescono con «Testo più grande».
+    @ScaledMetric(relativeTo: .title3) private var dimensioneTitolo: CGFloat = 19
+    @ScaledMetric(relativeTo: .subheadline) private var dimensioneDettaglio: CGFloat = 15
+
     private var testoTempo: some View {
         Text(tempo)
             .font(.piastra(64))
@@ -196,14 +206,16 @@ struct DockSessione: View {
                     HStack(spacing: 12) {
                         if let icona = principale.icona {
                             Image(systemName: icona)
-                                .font(.system(size: 19, weight: .semibold))
+                                .font(.system(size: dimensioneTitolo, weight: .semibold))
                                 .padding(.trailing, -4)
                         }
                         Text(principale.titolo)
-                            .font(.system(size: 19, weight: .semibold))
+                            .font(.system(size: dimensioneTitolo, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         if let dettaglio = principale.dettaglio {
                             Text(dettaglio)
-                                .font(.system(size: 15, weight: .medium))
+                                .font(.system(size: dimensioneDettaglio, weight: .medium))
                                 .monospacedDigit()
                         }
                     }
@@ -219,6 +231,8 @@ struct DockSessione: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity, minHeight: 224, maxHeight: 224, alignment: .top)
+        // Dock alto 224 pt fissi (la schermata ci si appoggia sopra): il testo cresce fino a xxxLarge.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .background {
             UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
                 .fill(sfondo)

@@ -82,6 +82,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pensa95.perno.widget
+        # Theme.swift è compilato anche qui: nella Live Activity i numeri in Barlow restano fissi.
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET"
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: "YES"
         CODE_SIGNING_ALLOWED: "NO"
