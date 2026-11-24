@@ -94,7 +94,7 @@ struct SezioniView: View {
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.schede.titolo, systemImage: Sezione.schede.icona) }
                 .tag(Sezione.schede)
-            NavigationStack { InArrivoView(titolo: Sezione.storico.titolo) }
+            NavigationStack { StoricoView() }
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.storico.titolo, systemImage: Sezione.storico.icona) }
                 .tag(Sezione.storico)
@@ -247,26 +247,6 @@ struct SezioniView: View {
         guard sessione == nil else { return }
         sessione = SessioneInCorso(sessione: registro, riprendi: true, context: context)
         schermoSessione = true
-    }
-}
-
-/// Sezione non ancora costruita (Storico arriva con le settimane 5–6).
-struct InArrivoView: View {
-    let titolo: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TestataSezione(titolo: titolo)
-            Text("Arriva in una delle prossime build.")
-                .font(.body)
-                .foregroundStyle(Color.inchiostroTenue)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .background(Color.lamiera)
-        .toolbar(.hidden, for: .navigationBar)
     }
 }
 
