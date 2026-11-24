@@ -32,6 +32,7 @@ enum Sezione: CaseIterable {
 struct SezioniView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(Backup.self) private var backup
     @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
     @State private var sezione: Sezione = .allenati
     @State private var sessione: SessioneInCorso?
@@ -81,8 +82,11 @@ struct SezioniView: View {
                 SessioneView(sessione: sessione,
                              riduci: { schermoSessione = false },
                              chiudi: {
+                                 // «Salva sessione»: la sessione è nello storico, poi il backup.
+                                 let nome = sessione.sessione.titolo
                                  schermoSessione = false
                                  self.sessione = nil
+                                 backup.esegui(context, dopo: nome)
                              },
                              elimina: {
                                  let registro = sessione.sessione
@@ -120,6 +124,7 @@ struct SezioniView: View {
                           registro.isSaved = true
                           try? context.save()
                           riepilogoInterrotta = nil
+                          backup.esegui(context, dopo: registro.titolo)
                       },
                       elimina: {
                           riepiloghiChiusi.insert(registro.id)
@@ -235,5 +240,7 @@ struct InArrivoView: View {
 
 #Preview {
     SezioniView()
+        .environment(Aspetto())
+        .environment(Backup())
         .modelContainer(for: Routine.self, inMemory: true)
 }
