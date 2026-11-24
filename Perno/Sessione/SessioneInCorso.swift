@@ -14,8 +14,8 @@ final class SessioneInCorso: Identifiable {
     private(set) var set: [[SessionSet]]
     /// Set di lavoro dell'ultima volta, per «prima 60 × 12».
     private(set) var prima: [[(weight: Double, reps: Int)]]
-    /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, che arrivano nella settimana 4).
-    let secondiContoAllaRovescia = 3
+    /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, «Prima di ogni set»).
+    let secondiContoAllaRovescia = Impostazioni.secondiContoAllaRovescia
 
     private(set) var macchina: SessionMachine
     /// Recupero abituale dell'esercizio corrente; aggiornato a ogni tocco.
@@ -29,7 +29,7 @@ final class SessioneInCorso: Identifiable {
     var modoRecupero: RestMode {
         didSet { UserDefaults.standard.set(modoRecupero.rawValue, forKey: Self.chiaveModoRecupero) }
     }
-    private static let chiaveModoRecupero = "recupero.modo"
+    private static let chiaveModoRecupero = Impostazioni.modoRecupero
     /// Secondi aggiunti con «+15 s» al recupero che inizia in `inizio`.
     private var aggiunta: (inizio: Date, secondi: TimeInterval)? = nil
 
@@ -200,7 +200,7 @@ final class SessioneInCorso: Identifiable {
                                                    reps: ripetizioni, kind: tipo)
             } else {
                 cambiati = try macchina.retargetSet(exercise: esercizio, set: indice, weight: peso,
-                                                    reps: ripetizioni, kind: tipo, step: PlateStep.standard)
+                                                    reps: ripetizioni, kind: tipo, step: PlateStep.current)
             }
         } catch {
             return
@@ -338,7 +338,7 @@ final class SessioneInCorso: Identifiable {
             context.insert(registrato)
             registrato.session = sessione
             let piano = SessionPlanner.plan(workSets: FreeSessionText.addedSets, repsMin: FreeSessionText.addedRepsMin,
-                                            approaches: 0, previous: precedenti, step: PlateStep.standard)
+                                            approaches: 0, previous: precedenti, step: PlateStep.current)
             var sets: [SessionSet] = []
             for (posizione, pianificato) in piano.enumerated() {
                 let nuovo = SessionSet(position: posizione, kind: pianificato.kind,

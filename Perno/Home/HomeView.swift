@@ -24,6 +24,9 @@ struct HomeView: View {
 
     @Environment(\.modelContext) private var context
     @State private var sessioneDaAnnullare: WorkoutSession?
+    @State private var impostazioniAperte = false
+    /// Letta solo per ridisegnare i kg quando cambia l'unità.
+    @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
 
     private var calendario: Calendar { .current }
 
@@ -89,7 +92,7 @@ struct HomeView: View {
                         .foregroundStyle(Color.inchiostro)
                     Spacer()
                     Button {
-                        // Settimana 4: Impostazioni.
+                        impostazioniAperte = true
                     } label: {
                         Image(systemName: "gearshape")
                             .font(.system(size: 20, weight: .medium))
@@ -133,6 +136,7 @@ struct HomeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $impostazioniAperte) { ImpostazioniView() }
         .confirmationDialog("Annullare la sessione?",
                             isPresented: Binding(get: { sessioneDaAnnullare != nil },
                                                  set: { if !$0 { sessioneDaAnnullare = nil } }),
@@ -318,7 +322,7 @@ struct HomeView: View {
             HStack(alignment: .top, spacing: 12) {
                 numero(HomeText.duration(sessione.durata), "durata")
                 numero("\(sessione.setFatti) set", "su \(sessione.setPrevisti)")
-                numero(HomeText.volume(sessione.chiliSollevati), "kg sollevati")
+                numero(HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)), "\(Units.unit.symbol) sollevati")
             }
             PulsanteSecondario(titolo: "Vedi nello storico", azione: apriStorico)
             Button {

@@ -15,6 +15,8 @@ struct SessioneView: View {
     let elimina: () -> Void
 
     @State private var correzione: Correzione?
+    @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
+    @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
     @State private var scriviNota = false
@@ -95,6 +97,16 @@ struct SessioneView: View {
             guard !Task.isCancelled else { return }
             sessione.contoAllaRovesciaFinito(alle: fine)
         }
+        .task(id: fineRecuperoAutomatica) {
+            // «Parti da solo a fine recupero»: a zero del conto alla rovescia parte il 3-2-1.
+            guard let fine = fineRecuperoAutomatica else { return }
+            let attesa = fine.timeIntervalSinceNow
+            if attesa > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
+            }
+            guard !Task.isCancelled, fineRecuperoAutomatica == fine else { return }
+            sessione.inizia()
+        }
         .task(id: sessione.avviso?.scadenza) {
             guard let scadenza = sessione.avviso?.scadenza else { return }
             let attesa = scadenza.timeIntervalSinceNow
@@ -113,6 +125,13 @@ struct SessioneView: View {
         .sheet(item: $correzione) { correzione in
             CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
         }
+    }
+
+    /// Fine del recupero alla rovescia, se deve partire da solo (impostazione attiva e set da fare).
+    private var fineRecuperoAutomatica: Date? {
+        guard partiDaSolo, sessione.modoRecupero == .countdown, case let .rest(dal) = sessione.fase,
+              sessione.setCorrente != nil else { return nil }
+        return dal.addingTimeInterval(sessione.durataRecupero)
     }
 
     private var inizioContoAllaRovescia: Date? {
@@ -368,7 +387,7 @@ struct SessioneView: View {
         if set.kind == .approach {
             let lavoro = sessione.set[indice].first { $0.kind != .approach }?.targetWeight
             let percento = SessionText.approachPercent(number: numero, count: approcci)
-            let nota = percento.map { p in lavoro.map { "\(p) di \(Weights.format($0))" } ?? p }
+            let nota = percento.map { p in lavoro.map { "\(p) di \(Units.show($0))" } ?? p }
             return PiastraSet(nome: nome, valore: obiettivo, stato: .adesso(
                 etichetta: inCorso ? "\(nome), in corso" : "\(nome), avvicinamento",
                 evidenza: nil, nota: nota))
@@ -487,6 +506,7 @@ struct SessioneView: View {
                 }
                 .buttonStyle(.plain)
             }
+            if chiediRiserva {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Quante ne avevi ancora?")
                     .font(.footnote.weight(.semibold))
@@ -510,6 +530,7 @@ struct SessioneView: View {
                 }
             }
             .padding(.trailing, 8)
+            }
         }
         .foregroundStyle(Color.inchiostro)
         .padding(.top, 8)
