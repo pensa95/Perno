@@ -97,3 +97,69 @@ final class SessionDetailTextTests: XCTestCase {
         XCTAssertNil(SessionDetailText.reserve(nil))
     }
 }
+
+final class ExerciseHistoryTests: XCTestCase {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func date(_ month: Int, _ day: Int) -> Date {
+        var parts = DateComponents()
+        parts.year = 2026
+        parts.month = month
+        parts.day = day
+        parts.hour = 18
+        return calendar.date(from: parts)!
+    }
+
+    private func lift(_ weight: Double, _ reps: Int) -> SessionSummary.Lift {
+        SessionSummary.Lift(weight: weight, reps: reps)
+    }
+
+    func testRecordLastAndNew() {
+        let exercise = ExerciseHistory.Exercise(id: 1, name: "Lat machine", entries: [
+            .init(date: date(11, 19), lifts: [lift(55, 10), lift(55, 9)]),
+            .init(date: date(11, 12), lifts: [lift(52.5, 10), lift(0, 10)]),
+        ])
+        XCTAssertEqual(exercise.record?.lift, lift(55, 10))
+        XCTAssertEqual(exercise.record?.date, date(11, 19))
+        XCTAssertEqual(exercise.last?.lift, lift(55, 10))
+        XCTAssertTrue(exercise.isNewRecord(today: date(11, 24), calendar: calendar))
+        XCTAssertFalse(exercise.isNewRecord(today: date(12, 10), calendar: calendar))
+        // La prima volta non è un record nuovo.
+        let first = ExerciseHistory.Exercise(id: 2, name: "Leg curl", entries: [.init(date: date(11, 19), lifts: [lift(40, 10)])])
+        XCTAssertFalse(first.isNewRecord(today: date(11, 20), calendar: calendar))
+        XCTAssertNil(first.stalledWeeks(today: date(12, 31), calendar: calendar))
+    }
+
+    func testStall() {
+        let exercise = ExerciseHistory.Exercise(id: 1, name: "Shoulder press", entries: [
+            .init(date: date(10, 29), lifts: [lift(32.5, 6)]),
+            .init(date: date(11, 19), lifts: [lift(30, 8)]),
+        ])
+        XCTAssertEqual(exercise.last?.lift, lift(30, 8))
+        XCTAssertEqual(exercise.stalledWeeks(today: date(11, 19), calendar: calendar), 3)
+        XCTAssertNil(exercise.stalledWeeks(today: date(11, 18), calendar: calendar))
+        XCTAssertEqual(ExerciseHistory.stallText(weeks: 3), "fermo da 3 settimane")
+    }
+
+    func testGroupsAndTexts() {
+        let done = [lift(50, 10)]
+        let exercises = [
+            ExerciseHistory.Exercise(id: 1, name: "Chest press", entries: [.init(date: date(11, 19), lifts: done)]),
+            ExerciseHistory.Exercise(id: 2, name: "Leg press", entries: [.init(date: date(11, 14), lifts: done)]),
+            ExerciseHistory.Exercise(id: 3, name: "Curl", entries: [.init(date: date(11, 14), lifts: done)]),
+            ExerciseHistory.Exercise(id: 4, name: "Mai fatto", entries: []),
+        ]
+        let routines: [(name: String, exercises: [Int])] = [("Upper body", [4, 1]), ("Gambe", [2]), ("Vuota", [])]
+        let groups = ExerciseHistory.groups(exercises: exercises, routines: routines, query: "")
+        XCTAssertEqual(groups.map(\.title), ["Upper body", "Gambe", "Altri esercizi"])
+        XCTAssertEqual(groups.map(\.count), ["1 esercizio", "1 esercizio", "1 esercizio"])
+        XCTAssertEqual(ExerciseHistory.groups(exercises: exercises, routines: routines, query: "LEG").map(\.title), ["Gambe"])
+
+        XCTAssertEqual(ExerciseHistory.shortDate(date(11, 19), today: date(11, 24), calendar: calendar), "gio 19")
+        XCTAssertEqual(ExerciseHistory.shortDate(date(10, 29), today: date(11, 24), calendar: calendar), "gio 29 ott")
+    }
+}
