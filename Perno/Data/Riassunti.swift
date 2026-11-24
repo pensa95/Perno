@@ -111,3 +111,47 @@ extension WorkoutSession {
         return SessionStats.breakdown(sets: fatti, pauses: pause)
     }
 }
+
+// MARK: - Storico
+
+extension WorkoutSession {
+    /// Nello storico: chiusa, esclusa quella chiusa da sola e non ancora salvata.
+    var nelloStorico: Bool { endedAt != nil && !(closedAutomatically && !isSaved) }
+
+    /// Set di lavoro fatti di un esercizio, come alzate (pesi in chili).
+    static func alzate(_ voce: SessionExercise) -> [SessionSummary.Lift] {
+        voce.orderedSets.compactMap { set in
+            guard set.isDone, set.kind != .approach, let peso = set.weight, let ripetizioni = set.reps else { return nil }
+            return SessionSummary.Lift(weight: peso, reps: ripetizioni)
+        }
+    }
+}
+
+extension Exercise {
+    /// Volte nello storico, dalla più recente: sessione e set di lavoro fatti.
+    var volteNelloStorico: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])] {
+        sessionExercises.compactMap { voce -> (sessione: WorkoutSession, alzate: [SessionSummary.Lift])? in
+            guard let sessione = voce.session, sessione.nelloStorico else { return nil }
+            let alzate = WorkoutSession.alzate(voce)
+            return alzate.isEmpty ? nil : (sessione, alzate)
+        }
+        .sorted { $0.sessione.startedAt > $1.sessione.startedAt }
+    }
+
+    /// L'esercizio come lo vede lo Storico (record, ultima volta, grafico).
+    var storico: ExerciseHistory.Exercise<UUID> {
+        ExerciseHistory.Exercise(id: id, name: name, entries: volteNelloStorico.map {
+            ExerciseHistory.Entry(date: $0.sessione.startedAt, lifts: $0.alzate)
+        })
+    }
+
+    /// Recupero abituale dai recuperi registrati (esclusi avvicinamenti e cambi).
+    var recuperoAbituale: Double? {
+        let durate = sessionExercises
+            .flatMap(\.pauses)
+            .filter { $0.kind == .rest && !$0.afterApproach }
+            .sorted { $0.start < $1.start }
+            .map(\.duration)
+        return SessionStats.usualRest(restDurations: durate)
+    }
+}

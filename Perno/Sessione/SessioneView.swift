@@ -15,6 +15,8 @@ struct SessioneView: View {
     let elimina: () -> Void
 
     @State private var correzione: Correzione?
+    /// Progressi: dettaglio dell'esercizio di adesso, in un foglio.
+    @State private var progressi: Exercise?
     @Environment(\.colorScheme) private var schema
     @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
@@ -141,6 +143,12 @@ struct SessioneView: View {
         .sheet(item: $correzione) { correzione in
             CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
         }
+        .sheet(item: $progressi) { esercizio in
+            NavigationStack {
+                DettaglioEsercizioView(esercizio: esercizio, indietro: "Sessione")
+                    .destinazioniStorico()
+            }
+        }
     }
 
     /// Fine del recupero alla rovescia, se deve partire da solo (impostazione attiva e set da fare).
@@ -260,8 +268,9 @@ struct SessioneView: View {
                 }
                 Spacer(minLength: 0)
                 PulsanteTondo(icona: "chart.line.uptrend.xyaxis", etichetta: "Progressi") {
-                    // Progressi: settimane 5–6.
+                    progressi = esercizio.exercise
                 }
+                .disabled(esercizio.exercise == nil)
                 menuEsercizio(esercizio)
             }
             .padding(.top, 24)

@@ -15,7 +15,6 @@ struct StoricoView: View {
 
     @Query(sort: \WorkoutSession.startedAt, order: .reverse) private var sessioni: [WorkoutSession]
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
-    @Environment(\.modelContext) private var context
     @State private var ricerca = ""
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
@@ -29,7 +28,7 @@ struct StoricoView: View {
 
     /// Sessioni nello storico: chiuse, escluse quelle chiuse da sole e non ancora salvate.
     private var chiuse: [WorkoutSession] {
-        sessioni.filter { $0.endedAt != nil && !($0.closedAutomatically && !$0.isSaved) }
+        sessioni.filter(\.nelloStorico)
     }
 
     private var vociStorico: [SessionHistory.Item<UUID>] {
@@ -103,19 +102,7 @@ struct StoricoView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(for: UUID.self) { id in
-            if let sessione = sessioni.first(where: { $0.id == id }) {
-                DettaglioSessioneView(sessione: sessione) { elimina(sessione) }
-            }
-        }
-    }
-
-    /// Elimina dopo la chiusura del dettaglio (così nessuna vista legge una sessione eliminata).
-    private func elimina(_ sessione: WorkoutSession) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            context.delete(sessione)
-            try? context.save()
-        }
+        .destinazioniStorico()
     }
 
     // MARK: Esercizi
@@ -181,7 +168,10 @@ struct StoricoView: View {
             }
             Pila {
                 ForEach(gruppo.exercises, id: \.id) { esercizio in
-                    cardEsercizio(esercizio)
+                    NavigationLink(value: RottaStorico.esercizio(esercizio.id, indietro: "Esercizi")) {
+                        cardEsercizio(esercizio)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -230,6 +220,7 @@ struct StoricoView: View {
                         .foregroundStyle(Color.inchiostroTenue)
                 }
             }
+            FrecciaVoce()
         }
         .vocePila(altezza: 68)
         .accessibilityElement(children: .combine)
@@ -363,7 +354,7 @@ struct StoricoView: View {
     }
 
     private func voceSessione(_ voce: SessionHistory.Item<UUID>) -> some View {
-        NavigationLink(value: voce.id) {
+        NavigationLink(value: RottaStorico.sessione(voce.id, indietro: Sezione.storico.titolo)) {
             contenutoVoce(voce)
         }
         .buttonStyle(.plain)

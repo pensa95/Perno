@@ -7,10 +7,11 @@ import PernoCore
 /// come piastrine (peso × ripetizioni e riserva; set non fatti solo bordo), coppa sui record, nota.
 struct DettaglioSessioneView: View {
     let sessione: WorkoutSession
-    /// «Elimina sessione»: la vista si chiude, poi la sessione si elimina.
-    let elimina: () -> Void
+    /// Nome della schermata a cui torna la freccia.
+    var indietro = "Storico"
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @State private var chiediEliminazione = false
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
@@ -34,13 +35,21 @@ struct DettaglioSessioneView: View {
         .background(Color.lamiera.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .confirmationDialog("Eliminare la sessione?", isPresented: $chiediEliminazione, titleVisibility: .visible) {
-            Button("Elimina sessione", role: .destructive) {
-                dismiss()
-                elimina()
-            }
+            Button("Elimina sessione", role: .destructive, action: elimina)
             Button("Annulla", role: .cancel) {}
         } message: {
             Text("La sessione viene eliminata con tutti i set.")
+        }
+    }
+
+    /// La vista si chiude, poi la sessione si elimina (così nessuna vista legge una sessione eliminata).
+    private func elimina() {
+        let registro = sessione
+        let context = context
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            context.delete(registro)
+            try? context.save()
         }
     }
 
@@ -48,7 +57,7 @@ struct DettaglioSessioneView: View {
 
     private var testata: some View {
         HStack {
-            PulsanteIndietro(titolo: "Storico") { dismiss() }
+            PulsanteIndietro(titolo: indietro) { dismiss() }
             Spacer()
             Menu {
                 Button(role: .destructive) {
@@ -112,13 +121,20 @@ struct DettaglioSessioneView: View {
                 .foregroundStyle(Color.inchiostro)
             Pila {
                 ForEach(sessione.orderedExercises.filter { !$0.sets.isEmpty }) { esercizio in
-                    card(esercizio, record: conRecord.contains(esercizio.name))
+                    if let id = esercizio.exercise?.id {
+                        NavigationLink(value: RottaStorico.esercizio(id, indietro: sessione.titolo)) {
+                            card(esercizio, record: conRecord.contains(esercizio.name), freccia: true)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        card(esercizio, record: conRecord.contains(esercizio.name), freccia: false)
+                    }
                 }
             }
         }
     }
 
-    private func card(_ esercizio: SessionExercise, record: Bool) -> some View {
+    private func card(_ esercizio: SessionExercise, record: Bool, freccia: Bool) -> some View {
         let set = esercizio.orderedSets
         let avvicinamenti = set.filter { $0.kind == .approach && $0.isDone }
             .map { (weight: $0.weight ?? $0.targetWeight, reps: $0.reps ?? $0.targetReps) }
@@ -136,6 +152,9 @@ struct DettaglioSessioneView: View {
                             .font(.footnote.weight(.semibold))
                     }
                     .foregroundStyle(Color.inchiostro)
+                }
+                if freccia {
+                    FrecciaVoce()
                 }
             }
             Text(SessionDetailText.approaches(avvicinamenti))

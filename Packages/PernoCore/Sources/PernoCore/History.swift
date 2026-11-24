@@ -313,3 +313,119 @@ public enum ExerciseHistory {
         "fermo da \(weeks) settimane"
     }
 }
+
+// MARK: - Dettaglio esercizio
+
+/// Dettaglio esercizio (tavola «M Dettaglio esercizio»): record, numeri, grafico del massimale
+/// stimato e ultime sessioni.
+public enum ExerciseProgress {
+    /// Periodo del grafico.
+    public enum Range: CaseIterable, Sendable {
+        case threeMonths
+        case sixMonths
+        case year
+        case all
+
+        /// «3 mesi», «6 mesi», «1 anno», «Tutto».
+        public var label: String {
+            switch self {
+            case .threeMonths: return "3 mesi"
+            case .sixMonths: return "6 mesi"
+            case .year: return "1 anno"
+            case .all: return "Tutto"
+            }
+        }
+
+        var months: Int? {
+            switch self {
+            case .threeMonths: return 3
+            case .sixMonths: return 6
+            case .year: return 12
+            case .all: return nil
+            }
+        }
+
+        /// «in 6 mesi», «in un anno», «in totale».
+        var span: String {
+            switch self {
+            case .threeMonths: return "in 3 mesi"
+            case .sixMonths: return "in 6 mesi"
+            case .year: return "in un anno"
+            case .all: return "in totale"
+            }
+        }
+    }
+
+    /// Punto del grafico: massimale stimato più alto della sessione (in chili).
+    public struct Point: Equatable, Sendable {
+        public var date: Date
+        public var estimatedMax: Double
+    }
+
+    /// Un punto per volta, dalla più vecchia.
+    public static func points<ID: Hashable>(_ exercise: ExerciseHistory.Exercise<ID>) -> [Point] {
+        exercise.valid.compactMap { entry in
+            entry.lifts.map(\.estimatedMax).max().map { Point(date: entry.date, estimatedMax: $0) }
+        }
+    }
+
+    /// Punti del periodo, contato all'indietro da oggi.
+    public static func points(_ points: [Point], in range: Range, today: Date, calendar: Calendar = .current) -> [Point] {
+        guard let months = range.months,
+              let start = calendar.date(byAdding: .month, value: -months, to: today) else { return points }
+        return points.filter { $0.date >= start }
+    }
+
+    /// «+25 kg in 6 mesi» (dal primo all'ultimo punto del periodo, nell'unità scelta); `nil` con meno di due punti.
+    public static func change(_ points: [Point], range: Range) -> String? {
+        guard points.count >= 2, let first = points.first, let last = points.last else { return nil }
+        let value = Int(Units.unit.fromKilograms(last.estimatedMax - first.estimatedMax).rounded())
+        let sign = value > 0 ? "+" : (value < 0 ? "−" : "")
+        return "\(sign)\(abs(value)) \(Units.unit.symbol) \(range.span)"
+    }
+
+    /// «giovedì 12 novembre · massimale stimato 82 kg».
+    public static func recordDetail(_ lift: SessionSummary.Lift, date: Date, calendar: Calendar = .current) -> String {
+        let day = ItalianDate.long(date, calendar: calendar)
+        let lowered = day.prefix(1).lowercased() + String(day.dropFirst())
+        let max = Int(Units.unit.fromKilograms(lift.estimatedMax).rounded())
+        return "\(lowered) · massimale stimato \(max) \(Units.unit.symbol)"
+    }
+
+    /// Sopra il nome: «Upper body · macchina»; senza scheda solo l'attrezzo.
+    public static func overline(routine: String?, equipment: Equipment) -> String {
+        let tool = equipment.label.lowercased()
+        guard let routine, !routine.isEmpty else { return tool }
+        return "\(routine) · \(tool)"
+    }
+
+    /// Data della riga di una sessione: «gio 19 nov».
+    public static func rowDate(_ date: Date, calendar: Calendar = .current) -> String {
+        let weekday = SessionHistory.weekdayShort(Weekday.of(date, calendar: calendar)).lowercased()
+        let month = ItalianDate.months[max(0, min(11, calendar.component(.month, from: date) - 1))]
+        return "\(weekday) \(calendar.component(.day, from: date)) \(month.prefix(3))"
+    }
+
+    /// Set di una sessione: «62,5 × 9 · 62,5 × 8 · 62,5 × 8».
+    public static func rowSets(_ lifts: [SessionSummary.Lift]) -> String {
+        lifts.map { SessionText.weightReps($0.weight, $0.reps) }.joined(separator: " · ")
+    }
+
+    /// Volte in cui è stato fatto un record: il miglior set supera tutte le volte prima
+    /// (serve almeno una volta prima, come nel riepilogo).
+    public static func recordDates<ID: Hashable>(_ exercise: ExerciseHistory.Exercise<ID>) -> Set<Date> {
+        var best: Double?
+        var dates = Set<Date>()
+        for entry in exercise.valid {
+            guard let today = entry.lifts.map(\.estimatedMax).max() else { continue }
+            if let previous = best, today > previous + 0.001 { dates.insert(entry.date) }
+            best = Swift.max(best ?? 0, today)
+        }
+        return dates
+    }
+
+    /// «24» volte con almeno un set valido.
+    public static func sessionCount<ID: Hashable>(_ exercise: ExerciseHistory.Exercise<ID>) -> Int {
+        exercise.valid.count
+    }
+}
