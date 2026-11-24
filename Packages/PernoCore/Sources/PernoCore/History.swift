@@ -141,3 +141,27 @@ public enum SessionHistory {
         return "\(first.day ?? 1) \(firstMonth.prefix(3)) – \(last.day ?? 1) \(lastMonth.prefix(3))"
     }
 }
+
+// MARK: - Dettaglio sessione
+
+/// Testi del dettaglio sessione (tavola «L Dettaglio sessione»).
+public enum SessionDetailText {
+    /// «Giovedì 19 novembre, dalle 18:04 alle 19:03».
+    public static func when(start: Date, end: Date, calendar: Calendar = .current) -> String {
+        "\(ItalianDate.long(start, calendar: calendar)), dalle \(ResumeText.time(start, calendar: calendar)) alle \(ResumeText.time(end, calendar: calendar))"
+    }
+
+    /// Avvicinamenti fatti (pesi in chili): «Avvicinamento 30 × 10, 45 × 6»; senza «Avvicinamento —».
+    public static func approaches(_ sets: [(weight: Double, reps: Int)]) -> String {
+        guard !sets.isEmpty else { return "Avvicinamento —" }
+        return "Avvicinamento " + sets.map { SessionText.weightReps($0.weight, $0.reps) }.joined(separator: ", ")
+    }
+
+    /// «riserva 1», «riserva 4+»; `nil` se la riserva non è stata data.
+    public static func reserve(_ reserve: Reserve?) -> String? {
+        reserve.map { "riserva \($0.label)" }
+    }
+
+    /// Set di lavoro non fatto.
+    public static let notDone = "non fatto"
+}

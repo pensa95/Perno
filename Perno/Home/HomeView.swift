@@ -8,8 +8,8 @@ import PernoCore
 struct HomeView: View {
     /// Sessione aperta in questo momento (anche ridotta).
     var sessioneViva: SessioneInCorso? = nil
-    /// Apre la sezione Storico («Vedi nello storico»).
-    var apriStorico: () -> Void = {}
+    /// «Vedi nello storico»: apre il dettaglio della sessione nello Storico.
+    var apriStorico: (WorkoutSession) -> Void = { _ in }
     var avvia: (Routine) -> Void = { _ in }
     var avviaLibera: () -> Void = {}
     var riprendi: (WorkoutSession) -> Void = { _ in }
@@ -325,7 +325,7 @@ struct HomeView: View {
                 numero("\(sessione.setFatti) set", "su \(sessione.setPrevisti)")
                 numero(HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)), "\(Units.unit.symbol) sollevati")
             }
-            PulsanteSecondario(titolo: "Vedi nello storico", azione: apriStorico)
+            PulsanteSecondario(titolo: "Vedi nello storico") { apriStorico(sessione) }
             Button {
                 sessioneDaAnnullare = sessione
             } label: {
