@@ -25,7 +25,6 @@ struct HomeView: View {
     @Environment(\.modelContext) private var context
     @Environment(Backup.self) private var backup
     @State private var sessioneDaAnnullare: WorkoutSession?
-    @State private var impostazioniAperte = false
     /// Letta solo per ridisegnare i kg quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
 
@@ -87,18 +86,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                TestataSezione(titolo: "Allenati") {
-                    Button {
-                        impostazioniAperte = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(Color.inchiostro)
-                            .frame(width: 44, height: 44, alignment: .trailing)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Impostazioni")
-                }
+                TestataSezione(titolo: Sezione.allenati.titolo)
 
                 if backup.fallito {
                     AvvisoBackup()
@@ -137,7 +125,6 @@ struct HomeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(isPresented: $impostazioniAperte) { ImpostazioniView() }
         .confirmationDialog("Annullare la sessione?",
                             isPresented: Binding(get: { sessioneDaAnnullare != nil },
                                                  set: { if !$0 { sessioneDaAnnullare = nil } }),
@@ -151,10 +138,14 @@ struct HomeView: View {
     }
 
     /// «Annulla sessione» sulla card di oggi fatto: elimina la sessione (set e pause compresi).
+    /// Il dialogo si chiude prima, poi la sessione si elimina (così nessuna vista legge una
+    /// sessione già eliminata, come per il riepilogo e il dettaglio).
     private func annulla(_ sessione: WorkoutSession) {
-        context.delete(sessione)
-        try? context.save()
         sessioneDaAnnullare = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            context.delete(sessione)
+            try? context.save()
+        }
     }
 
     private var titoloOggi: String { "Oggi, \(Weekday.name(oggi).lowercased())" }

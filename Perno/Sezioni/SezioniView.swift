@@ -2,17 +2,22 @@ import SwiftUI
 import SwiftData
 import PernoCore
 
-/// Le tre sezioni dell'app (Allenati, Schede, Storico).
+/// Le sezioni dell'app (Allenati, Schede, Piano, Storico, Impostazioni). Piano e Impostazioni sono
+/// sezioni a sé dal 24/11 (prima il piano era in Schede e le Impostazioni dalla rotella della Home).
 enum Sezione: CaseIterable {
     case allenati
     case schede
+    case piano
     case storico
+    case impostazioni
 
     var titolo: String {
         switch self {
         case .allenati: return "Allenati"
         case .schede: return "Schede"
+        case .piano: return "Piano"
         case .storico: return "Storico"
+        case .impostazioni: return "Impostazioni"
         }
     }
 
@@ -20,12 +25,26 @@ enum Sezione: CaseIterable {
         switch self {
         case .allenati: return "dumbbell.fill"
         case .schede: return "text.alignleft"
+        case .piano: return "calendar"
         case .storico: return "chart.bar"
+        case .impostazioni: return "gearshape"
         }
     }
 }
 
-/// Radice dell'app: la barra delle sezioni è quella di sistema (TabView), così posizione,
+/// Apre un'altra sezione (per esempio «Cambia» nell'editor della scheda apre il Piano).
+private struct ApriSezioneKey: EnvironmentKey {
+    static let defaultValue: (Sezione) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var apriSezione: (Sezione) -> Void {
+        get { self[ApriSezioneKey.self] }
+        set { self[ApriSezioneKey.self] = newValue }
+    }
+}
+
+/// Radice dell'app: la barra delle sezioni è quella di sistema (TabView, cinque sezioni), così posizione,
 /// materiale e comportamento sono uguali alle altre app iOS.
 /// Tiene anche la sessione aperta: schermata intera, card in Home quando è ridotta e barra ridotta
 /// sulle altre sezioni.
@@ -99,12 +118,21 @@ struct SezioniView: View {
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.schede.titolo, systemImage: Sezione.schede.icona) }
                 .tag(Sezione.schede)
+            NavigationStack { PianoView() }
+                .safeAreaInset(edge: .bottom) { barraRidotta }
+                .tabItem { Label(Sezione.piano.titolo, systemImage: Sezione.piano.icona) }
+                .tag(Sezione.piano)
             NavigationStack(path: $percorsoStorico) { StoricoView() }
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.storico.titolo, systemImage: Sezione.storico.icona) }
                 .tag(Sezione.storico)
+            NavigationStack { ImpostazioniView() }
+                .safeAreaInset(edge: .bottom) { barraRidotta }
+                .tabItem { Label(Sezione.impostazioni.titolo, systemImage: Sezione.impostazioni.icona) }
+                .tag(Sezione.impostazioni)
         }
         .tint(Color.inchiostro)
+        .environment(\.apriSezione) { sezione = $0 }
         .background {
             Color.clear
                 .fullScreenCover(item: Binding(get: { riepilogoDaMostrare },

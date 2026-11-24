@@ -139,8 +139,11 @@ extension Exercise {
     }
 
     /// L'esercizio come lo vede lo Storico (record, ultima volta, grafico).
-    var storico: ExerciseHistory.Exercise<UUID> {
-        ExerciseHistory.Exercise(id: id, name: name, entries: volteNelloStorico.map {
+    var storico: ExerciseHistory.Exercise<UUID> { storico(da: volteNelloStorico) }
+
+    /// Come `storico`, dalle volte già lette (per non scorrere le sessioni due volte).
+    func storico(da volte: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])]) -> ExerciseHistory.Exercise<UUID> {
+        ExerciseHistory.Exercise(id: id, name: name, entries: volte.map {
             ExerciseHistory.Entry(date: $0.sessione.startedAt, lifts: $0.alzate)
         })
     }

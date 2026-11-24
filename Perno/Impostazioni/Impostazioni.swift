@@ -82,11 +82,10 @@ final class Aspetto {
 
 // MARK: - Impostazioni
 
-/// Impostazioni (tavola «Impostazioni»): Aspetto, Riscaldamento, Prima di ogni set, Recupero,
+/// Impostazioni (tavola «Impostazioni», sezione della barra dal 24/11): Aspetto, Riscaldamento, Prima di ogni set, Recupero,
 /// Dopo ogni set, Dati.
 struct ImpostazioniView: View {
     @Environment(Aspetto.self) private var aspetto
-    @Environment(\.dismiss) private var dismiss
 
     @AppStorage(Impostazioni.riscaldamento) private var riscaldamento = true
     @AppStorage(Impostazioni.secondiPrimaDelSet) private var secondi = 3
@@ -105,7 +104,7 @@ struct ImpostazioniView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                TestataImpostazioni(titolo: "Impostazioni") { dismiss() }
+                TestataSezione(titolo: Sezione.impostazioni.titolo)
 
                 sezione("Aspetto", nota: "Se l'iPhone passa da solo da chiaro a scuro, l'app fa lo stesso.") {
                     SelettoreSegmenti(valori: [ColorScheme.light, .dark],

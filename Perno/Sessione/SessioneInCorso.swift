@@ -525,12 +525,22 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
+    /// Esercizio e numero di pause per cui il recupero abituale è già calcolato.
+    @ObservationIgnored private var recuperoCalcolatoPer: (esercizio: UUID, pause: Int)? = nil
+
     /// Media dei recuperi dei set di lavoro di questo esercizio (sessioni passate e di oggi).
+    /// Si ricalcola solo se cambia l'esercizio o se c'è una pausa nuova (non a ogni tocco).
     private func aggiornaRecuperoAbituale() {
         guard let esercizio = esercizioCorrente?.exercise else {
             recuperoAbituale = nil
+            recuperoCalcolatoPer = nil
             return
         }
+        let chiave = (esercizio: esercizio.id, pause: macchina.pauses.count)
+        if let fatto = recuperoCalcolatoPer, fatto.esercizio == chiave.esercizio, fatto.pause == chiave.pause {
+            return
+        }
+        recuperoCalcolatoPer = chiave
         let pause = esercizio.sessionExercises
             .flatMap(\.pauses)
             .filter { $0.kind == .rest }

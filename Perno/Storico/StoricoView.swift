@@ -31,8 +31,11 @@ struct StoricoView: View {
         sessioni.filter(\.nelloStorico)
     }
 
-    private var vociStorico: [SessionHistory.Item<UUID>] {
-        chiuse.map { sessione in
+    /// Righe delle sessioni. La coppa viene dai record di ogni esercizio, calcolati in un solo
+    /// passaggio (`ExerciseDetail.recordDates`), non sessione per sessione.
+    private func vociStorico(_ chiuse: [WorkoutSession], esercizi: [ExerciseHistory.Exercise<UUID>]) -> [SessionHistory.Item<UUID>] {
+        let conRecord = esercizi.reduce(into: Set<Date>()) { $0.formUnion(ExerciseDetail.recordDates($1)) }
+        return chiuse.map { sessione in
             SessionHistory.Item(
                 id: sessione.id,
                 start: sessione.startedAt,
@@ -41,20 +44,17 @@ struct StoricoView: View {
                 sets: sessione.setFatti,
                 isFree: sessione.isFree,
                 exercises: sessione.exercises.filter { $0.sets.contains(where: \.isDone) }.count,
-                hasRecord: !sessione.record.isEmpty)
+                hasRecord: conRecord.contains(sessione.startedAt))
         }
     }
 
     /// Esercizi fatti nelle sessioni dello storico, con i set di lavoro di ogni volta.
-    private var eserciziStorico: [ExerciseHistory.Exercise<UUID>] {
+    private func eserciziStorico(_ chiuse: [WorkoutSession]) -> [ExerciseHistory.Exercise<UUID>] {
         var volte: [UUID: (nome: String, voci: [ExerciseHistory.Entry])] = [:]
         for sessione in chiuse {
             for voce in sessione.exercises {
                 guard let esercizio = voce.exercise else { continue }
-                let alzate = voce.sets.compactMap { set -> SessionSummary.Lift? in
-                    guard set.isDone, set.kind != .approach, let peso = set.weight, let ripetizioni = set.reps else { return nil }
-                    return SessionSummary.Lift(weight: peso, reps: ripetizioni)
-                }
+                let alzate = WorkoutSession.alzate(voce)
                 guard !alzate.isEmpty else { continue }
                 volte[esercizio.id, default: (esercizio.name, [])].voci
                     .append(ExerciseHistory.Entry(date: sessione.startedAt, lifts: alzate))
@@ -63,9 +63,9 @@ struct StoricoView: View {
         return volte.map { ExerciseHistory.Exercise(id: $0.key, name: $0.value.nome, entries: $0.value.voci) }
     }
 
-    private var gruppiEsercizi: [ExerciseHistory.Group<UUID>] {
+    private func gruppiEsercizi(_ esercizi: [ExerciseHistory.Exercise<UUID>]) -> [ExerciseHistory.Group<UUID>] {
         ExerciseHistory.groups(
-            exercises: eserciziStorico,
+            exercises: esercizi,
             routines: schede.map { (name: $0.name, exercises: $0.orderedEntries.compactMap { $0.exercise?.id }) },
             query: ricerca)
     }
@@ -73,7 +73,10 @@ struct StoricoView: View {
     // MARK: Vista
 
     var body: some View {
-        let voci = vociStorico
+        // Calcolati una volta per ridisegno e passati alle parti che li usano.
+        let nelloStorico = chiuse
+        let esercizi = eserciziStorico(nelloStorico)
+        let voci = vista == .sessioni ? vociStorico(nelloStorico, esercizi: esercizi) : []
         let anni = SessionHistory.years(voci, calendar: calendario)
         let anno = annoScelto ?? SessionHistory.defaultYear(voci, today: .now, calendar: calendario)
         VStack(spacing: 12) {
@@ -95,7 +98,7 @@ struct StoricoView: View {
                     elenco(SessionHistory.months(voci, year: anno, calendar: calendario))
                 }
             case .esercizi:
-                esercizi
+                elencoEsercizi(esercizi)
             }
         }
         .padding(.top, 8)
@@ -108,11 +111,11 @@ struct StoricoView: View {
     // MARK: Esercizi
 
     @ViewBuilder
-    private var esercizi: some View {
-        if eserciziStorico.isEmpty {
+    private func elencoEsercizi(_ esercizi: [ExerciseHistory.Exercise<UUID>]) -> some View {
+        if esercizi.isEmpty {
             vuoto("Gli esercizi fatti compaiono qui.")
         } else {
-            let gruppi = gruppiEsercizi
+            let gruppi = gruppiEsercizi(esercizi)
             VStack(spacing: 0) {
                 campoRicerca
                     .padding(.horizontal, 20)

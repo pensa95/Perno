@@ -8,6 +8,7 @@ struct EditorSchedaView: View {
     @Bindable var scheda: Routine
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.apriSezione) private var apriSezione
     @Environment(\.modelContext) private var context
     @Query private var schede: [Routine]
     @State private var esercizioAperto: RoutineEntry?
@@ -81,7 +82,7 @@ struct EditorSchedaView: View {
             VStack(spacing: 12) {
                 EtichettaSezione("Nel piano settimanale")
                 Button {
-                    dismiss() // il piano si cambia dalla schermata Schede
+                    apriSezione(.piano) // il piano si cambia dalla sezione Piano
                 } label: {
                     VocePila(titolo: PlanDaysText.list(giorniNelPiano) ?? "Nessun giorno", dettaglio: "Cambia")
                 }
