@@ -67,6 +67,12 @@ struct SezioniView: View {
     @State private var riepiloghiChiusi: Set<UUID> = []
     /// Sessione interrotta aperta con «Chiudi e vai al riepilogo».
     @State private var riepilogoInterrotta: WorkoutSession?
+    /// Animazione tra la card della Home e la barra ridotta quando si cambia sezione.
+    @State private var cornici = CorniciSessione()
+    @State private var passaggio: PassaggioSessione?
+    @State private var passaggioInCorso = false
+    @State private var numeroPassaggio = 0
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
     var body: some View {
         if mostraPrimoAvvio {
@@ -110,7 +116,9 @@ struct SezioniView: View {
                          avviaLibera: avviaLibera,
                          riprendi: riprendi,
                          apriSessione: { schermoSessione = true },
-                         apriRiepilogo: { riepilogoInterrotta = $0 })
+                         apriRiepilogo: { riepilogoInterrotta = $0 },
+                         nascondiCardInCorso: passaggioInCorso,
+                         misuraCardInCorso: { cornici.card = $0 })
             }
             .tabItem { Label(Sezione.allenati.titolo, systemImage: Sezione.allenati.icona) }
             .tag(Sezione.allenati)
@@ -132,6 +140,18 @@ struct SezioniView: View {
                 .tag(Sezione.impostazioni)
         }
         .tint(Color.inchiostro)
+        .overlay {
+            if let passaggio, let sessione {
+                FantasmaSessione(sessione: sessione, passaggio: passaggio)
+            }
+        }
+        .onChange(of: sezione) { vecchia, nuova in
+            if vecchia == .allenati && nuova != .allenati {
+                avviaPassaggio(versoBarra: true)
+            } else if vecchia != .allenati && nuova == .allenati {
+                avviaPassaggio(versoBarra: false)
+            }
+        }
         .environment(\.apriSezione) { sezione = $0 }
         .background {
             Color.clear
@@ -257,9 +277,45 @@ struct SezioniView: View {
     private var barraRidotta: some View {
         if let sessione, !schermoSessione {
             BarraSessione(sessione: sessione) { schermoSessione = true }
+                .misuraCornice { cornici.barra = $0 }
+                .opacity(passaggioInCorso ? 0 : 1)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
         }
+    }
+
+    /// Lasciando la Home con una sessione ridotta la card si trasforma nella barra; tornando alla Home la
+    /// barra si trasforma nella card. Card e barra vere restano nascoste finché il fantasma non arriva.
+    /// Con «Riduci movimento» il passaggio resta istantaneo.
+    private func avviaPassaggio(versoBarra: Bool) {
+        guard sessione != nil, !schermoSessione, !menoMovimento else { return }
+        numeroPassaggio += 1
+        let numero = numeroPassaggio
+        passaggioInCorso = true
+        // Al primo giro la cornice della sezione appena aperta si misura nel ciclo successivo.
+        DispatchQueue.main.async {
+            guard numero == numeroPassaggio, let card = cornici.card, let barra = cornici.barra,
+                  !card.isEmpty, !barra.isEmpty else {
+                if numero == numeroPassaggio { finePassaggio() }
+                return
+            }
+            passaggio = PassaggioSessione(da: versoBarra ? card : barra, a: versoBarra ? barra : card,
+                                          versoBarra: versoBarra)
+            DispatchQueue.main.async {
+                guard numero == numeroPassaggio else { return }
+                withAnimation(.spring(duration: PassaggioSessione.durata, bounce: 0.12)) {
+                    passaggio?.arrivato = true
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + PassaggioSessione.durata + 0.05) {
+                if numero == numeroPassaggio { finePassaggio() }
+            }
+        }
+    }
+
+    private func finePassaggio() {
+        passaggio = nil
+        passaggioInCorso = false
     }
 
     /// «Inizia …»: crea il registro dalla scheda e apre la schermata della sessione.
