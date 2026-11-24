@@ -96,7 +96,22 @@ struct SessioneView: View {
                 try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
             }
             guard !Task.isCancelled else { return }
+            Segnali.shared.via()
             sessione.contoAllaRovesciaFinito(alle: fine)
+        }
+        .task(id: inizioContoAllaRovescia) {
+            // Bip e vibrazione a ogni secondo degli ultimi 3 del 3-2-1 («via» quando finisce).
+            guard let dal = inizioContoAllaRovescia else { return }
+            let totale = sessione.secondiContoAllaRovescia
+            for passo in 0..<totale where totale - passo <= 3 {
+                let attesa = dal.addingTimeInterval(TimeInterval(passo)).timeIntervalSinceNow
+                if attesa < -0.5 { continue }
+                if attesa > 0 {
+                    try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
+                }
+                guard !Task.isCancelled else { return }
+                Segnali.shared.secondo()
+            }
         }
         .task(id: fineRecuperoAutomatica) {
             // «Parti da solo a fine recupero»: a zero del conto alla rovescia parte il 3-2-1.

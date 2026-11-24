@@ -20,6 +20,35 @@ struct EtichettaSezione: View {
     }
 }
 
+// MARK: - Testata delle sezioni
+
+/// Titolo delle tre sezioni (Allenati, Schede, Storico): Barlow 40, riga alta almeno 44 pt, 4 pt
+/// sotto il bordo del contenuto (che parte 8 pt sotto l'area sicura). Uguale ovunque, così il
+/// titolo non salta passando da una sezione all'altra.
+struct TestataSezione<Azioni: View>: View {
+    let titolo: String
+    @ViewBuilder var azioni: Azioni
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Text(titolo)
+                .font(.piastra(40))
+                .foregroundStyle(Color.inchiostro)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+            azioni
+        }
+        .frame(minHeight: 44)
+        .padding(.top, 4)
+    }
+}
+
+extension TestataSezione where Azioni == EmptyView {
+    init(titolo: String) {
+        self.init(titolo: titolo) { EmptyView() }
+    }
+}
+
 // MARK: - Pila
 
 /// Pila: ogni voce è una piastrina bianca a sé, raggio 8, 4 pt tra una e l'altra, nessun separatore.

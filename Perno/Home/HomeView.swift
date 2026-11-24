@@ -87,11 +87,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text("Allenati")
-                        .font(.piastra(40))
-                        .foregroundStyle(Color.inchiostro)
-                    Spacer()
+                TestataSezione(titolo: "Allenati") {
                     Button {
                         impostazioniAperte = true
                     } label: {
@@ -103,7 +99,6 @@ struct HomeView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Impostazioni")
                 }
-                .padding(.top, 4)
 
                 if backup.fallito {
                     AvvisoBackup()

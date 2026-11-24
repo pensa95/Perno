@@ -23,10 +23,7 @@ struct SchedeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Schede")
-                    .font(.piastra(40))
-                    .foregroundStyle(Color.inchiostro)
-                    .padding(.top, 12)
+                TestataSezione(titolo: "Schede")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Piano settimanale")
