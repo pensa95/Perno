@@ -318,7 +318,7 @@ public enum ExerciseHistory {
 
 /// Dettaglio esercizio (tavola «M Dettaglio esercizio»): record, numeri, grafico del massimale
 /// stimato e ultime sessioni.
-public enum ExerciseProgress {
+public enum ExerciseDetail {
     /// Periodo del grafico.
     public enum Range: CaseIterable, Sendable {
         case threeMonths

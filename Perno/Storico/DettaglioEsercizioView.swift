@@ -13,7 +13,7 @@ struct DettaglioEsercizioView: View {
     var indietro = "Esercizi"
 
     @Environment(\.dismiss) private var dismiss
-    @State private var periodo: ExerciseProgress.Range = .sixMonths
+    @State private var periodo: ExerciseDetail.Range = .sixMonths
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
 
@@ -44,7 +44,7 @@ struct DettaglioEsercizioView: View {
     var body: some View {
         let storico = esercizio.storico
         let volte = esercizio.volteNelloStorico
-        let record = ExerciseProgress.recordDates(storico)
+        let record = ExerciseDetail.recordDates(storico)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 PulsanteIndietro(titolo: indietro) { dismiss() }
@@ -70,7 +70,7 @@ struct DettaglioEsercizioView: View {
 
     private var titolo: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(ExerciseProgress.overline(routine: voceScheda?.routine?.name, equipment: esercizio.equipment))
+            Text(ExerciseDetail.overline(routine: voceScheda?.routine?.name, equipment: esercizio.equipment))
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Color.inchiostroTenue)
             Text(esercizio.name)
@@ -101,7 +101,7 @@ struct DettaglioEsercizioView: View {
                     .foregroundStyle(Color.piastraTesto)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(ExerciseProgress.recordDetail(alzata, date: data))
+                Text(ExerciseDetail.recordDetail(alzata, date: data))
                     .font(.footnote)
                     .foregroundStyle(Color.piastraTenue)
             }
@@ -117,7 +117,7 @@ struct DettaglioEsercizioView: View {
     private func numeri(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
         HStack(alignment: .top, spacing: 12) {
             numero(storico.last.map { SessionText.weightReps($0.lift.weight, $0.lift.reps) } ?? "—", "ultima volta")
-            numero(String(ExerciseProgress.sessionCount(storico)), "sessioni")
+            numero(String(ExerciseDetail.sessionCount(storico)), "sessioni")
             numero(esercizio.recuperoAbituale.map { HomeText.duration($0) } ?? "—", "recupero abituale")
         }
     }
@@ -141,20 +141,20 @@ struct DettaglioEsercizioView: View {
     // MARK: Grafico
 
     private func grafico(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
-        let punti = ExerciseProgress.points(ExerciseProgress.points(storico), in: periodo, today: .now)
+        let punti = ExerciseDetail.points(ExerciseDetail.points(storico), in: periodo, today: .now)
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Massimale stimato")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.inchiostro)
                 Spacer(minLength: 8)
-                if let variazione = ExerciseProgress.change(punti, range: periodo) {
+                if let variazione = ExerciseDetail.change(punti, range: periodo) {
                     Text(variazione)
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(Color.inchiostroTenue)
                 }
             }
-            SelettoreSegmenti(valori: ExerciseProgress.Range.allCases, selezione: $periodo) { $0.label }
+            SelettoreSegmenti(valori: ExerciseDetail.Range.allCases, selezione: $periodo) { $0.label }
             Group {
                 if punti.count >= 2 {
                     curva(punti)
@@ -174,7 +174,7 @@ struct DettaglioEsercizioView: View {
     }
 
     /// Linea inchiostro del massimale stimato; l'ultimo punto col perno giallo. Asse dei valori a destra.
-    private func curva(_ punti: [ExerciseProgress.Point]) -> some View {
+    private func curva(_ punti: [ExerciseDetail.Point]) -> some View {
         let valori = punti.map { Units.unit.fromKilograms($0.estimatedMax) }
         let minimo = valori.min() ?? 0
         let massimo = valori.max() ?? 0
@@ -321,11 +321,11 @@ struct RigaSessioneEsercizio: View {
     var body: some View {
         NavigationLink(value: RottaStorico.sessione(sessione.id, indietro: indietro)) {
             HStack(spacing: 12) {
-                Text(ExerciseProgress.rowDate(sessione.startedAt))
+                Text(ExerciseDetail.rowDate(sessione.startedAt))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.inchiostro)
                     .frame(width: 84, alignment: .leading)
-                Text(ExerciseProgress.rowSets(alzate))
+                Text(ExerciseDetail.rowSets(alzate))
                     .font(.piastra(18, peso: .medium))
                     .monospacedDigit()
                     .foregroundStyle(Color.inchiostro)
@@ -354,7 +354,7 @@ struct SessioniEsercizioView: View {
 
     var body: some View {
         let volte = esercizio.volteNelloStorico
-        let record = ExerciseProgress.recordDates(esercizio.storico)
+        let record = ExerciseDetail.recordDates(esercizio.storico)
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 PulsanteIndietro(titolo: indietro) { dismiss() }

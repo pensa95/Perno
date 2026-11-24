@@ -164,7 +164,7 @@ final class ExerciseHistoryTests: XCTestCase {
     }
 }
 
-final class ExerciseProgressTests: XCTestCase {
+final class ExerciseDetailTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -186,21 +186,21 @@ final class ExerciseProgressTests: XCTestCase {
             .init(date: date(11, 12), lifts: [.init(weight: 65, reps: 8), .init(weight: 62.5, reps: 8)]),
             .init(date: date(11, 19), lifts: [.init(weight: 62.5, reps: 9)]),
         ])
-        let all = ExerciseProgress.points(exercise)
+        let all = ExerciseDetail.points(exercise)
         XCTAssertEqual(all.count, 3)
         XCTAssertEqual(all[1].estimatedMax, 65 * (1 + 8.0 / 30), accuracy: 0.001)
-        let six = ExerciseProgress.points(all, in: .sixMonths, today: date(11, 24), calendar: calendar)
+        let six = ExerciseDetail.points(all, in: .sixMonths, today: date(11, 24), calendar: calendar)
         XCTAssertEqual(six.count, 2)
-        XCTAssertEqual(ExerciseProgress.points(all, in: .all, today: date(11, 24), calendar: calendar).count, 3)
-        XCTAssertNil(ExerciseProgress.change([all[0]], range: .all))
-        XCTAssertEqual(ExerciseProgress.recordDates(exercise), [date(11, 12)])
-        XCTAssertEqual(ExerciseProgress.sessionCount(exercise), 3)
+        XCTAssertEqual(ExerciseDetail.points(all, in: .all, today: date(11, 24), calendar: calendar).count, 3)
+        XCTAssertNil(ExerciseDetail.change([all[0]], range: .all))
+        XCTAssertEqual(ExerciseDetail.recordDates(exercise), [date(11, 12)])
+        XCTAssertEqual(ExerciseDetail.sessionCount(exercise), 3)
     }
 
     func testTexts() {
-        XCTAssertEqual(ExerciseProgress.Range.allCases.map(\.label), ["3 mesi", "6 mesi", "1 anno", "Tutto"])
-        XCTAssertEqual(ExerciseProgress.overline(routine: "Upper body", equipment: .machine), "Upper body · macchina")
-        XCTAssertEqual(ExerciseProgress.overline(routine: nil, equipment: .machine), "macchina")
-        XCTAssertEqual(ExerciseProgress.rowDate(date(11, 19), calendar: calendar), "gio 19 nov")
+        XCTAssertEqual(ExerciseDetail.Range.allCases.map(\.label), ["3 mesi", "6 mesi", "1 anno", "Tutto"])
+        XCTAssertEqual(ExerciseDetail.overline(routine: "Upper body", equipment: .machine), "Upper body · macchina")
+        XCTAssertEqual(ExerciseDetail.overline(routine: nil, equipment: .machine), "macchina")
+        XCTAssertEqual(ExerciseDetail.rowDate(date(11, 19), calendar: calendar), "gio 19 nov")
     }
 }
