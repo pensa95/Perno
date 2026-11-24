@@ -13,6 +13,7 @@ struct DettaglioSessioneView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var chiediEliminazione = false
+    @State private var pdf: FileDaCondividere?
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
 
@@ -40,6 +41,10 @@ struct DettaglioSessioneView: View {
         } message: {
             Text("La sessione viene eliminata con tutti i set.")
         }
+        .sheet(item: $pdf) { file in
+            FoglioCondivisione(url: file.url)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     /// La vista si chiude, poi la sessione si elimina (così nessuna vista legge una sessione eliminata).
@@ -60,6 +65,9 @@ struct DettaglioSessioneView: View {
             PulsanteIndietro(titolo: indietro) { dismiss() }
             Spacer()
             Menu {
+                Button(action: esportaPDF) {
+                    Label("Esporta PDF", systemImage: "square.and.arrow.up")
+                }
                 Button(role: .destructive) {
                     chiediEliminazione = true
                 } label: {
@@ -72,7 +80,14 @@ struct DettaglioSessioneView: View {
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel("Altre azioni")
+            .accessibilityHint("Esporta PDF, elimina sessione")
         }
+    }
+
+    /// «Esporta PDF»: foglio da stampare della sessione, poi il foglio di condivisione.
+    private func esportaPDF() {
+        let nome = PrintText.fileName(title: sessione.titolo, date: sessione.startedAt)
+        pdf = (try? FoglioPDF.crea(sessione.foglioDaStampare, nomeFile: nome)).map(FileDaCondividere.init)
     }
 
     private var titolo: some View {
