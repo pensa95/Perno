@@ -284,7 +284,7 @@ struct AvvisoBackup: View {
                         } label: {
                             Text("Riseleziona cartella")
                                 .font(.body.weight(.semibold))
-                                .foregroundStyle(Color.foglio)
+                                .foregroundStyle(Color.suInchiostro)
                                 .frame(maxWidth: .infinity, minHeight: 52)
                                 .background(Color.inchiostro, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }

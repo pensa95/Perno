@@ -112,7 +112,7 @@ struct VoceScelta: View {
                         Circle().fill(Color.inchiostro)
                         Image(systemName: "checkmark")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.foglio)
+                            .foregroundStyle(Color.suInchiostro)
                     } else {
                         Circle().strokeBorder(Color.linea, lineWidth: 2)
                     }
@@ -209,7 +209,7 @@ struct Scelta: View {
         Button(action: azione) {
             Text(titolo)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(scelta ? Color.foglio : Color.inchiostro)
+                .foregroundStyle(scelta ? Color.suInchiostro : Color.inchiostro)
                 .lineLimit(1)
                 .padding(.horizontal, riempi ? 4 : 14)
                 .frame(maxWidth: riempi ? .infinity : nil, minHeight: altezza)
@@ -358,7 +358,7 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
                             if scelto {
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .fill(Color.foglio)
-                                    .shadow(color: Color.inchiostro.opacity(0.12), radius: 1.5, y: 1)
+                                    .shadow(color: Color.ombra.opacity(0.12), radius: 1.5, y: 1)
                             }
                         }
                         .contentShape(Rectangle())
@@ -452,17 +452,17 @@ struct CalendarioSettimana: View {
                 }
         case .skipped:
             forma.fill(Color.lamiera)
-                .overlay { forma.strokeBorder(Color.piastra, lineWidth: 2) }
+                .overlay { forma.strokeBorder(Color.bordoSaltato, lineWidth: 2) }
         case .planned:
             forma.fill(giorno.isToday ? Color.foglio : Color.lamiera)
                 .overlay {
-                    forma.strokeBorder(giorno.isToday ? Color.piastra : Color.piastraTenue,
+                    forma.strokeBorder(giorno.isToday ? Color.bordoOggi : Color.bordoProgramma,
                                        style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
                 }
         case .rest:
             ZStack {
                 Rectangle().fill(Color.lamiera).frame(width: 18, height: 12)
-                Circle().fill(Color.piastraTenue).frame(width: 4, height: 4)
+                Circle().fill(Color.puntoRiposo).frame(width: 4, height: 4)
             }
         }
     }

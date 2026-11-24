@@ -127,7 +127,7 @@ struct SchedeView: View {
                 if giorno == Weekday.of(.now) {
                     Text("oggi")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.foglio)
+                        .foregroundStyle(Color.suInchiostro)
                         .padding(.horizontal, 8)
                         .frame(height: 22)
                         .background(Color.inchiostro, in: Capsule())

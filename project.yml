@@ -28,7 +28,8 @@ targets:
       path: Support/Info.plist
       properties:
         CFBundleDisplayName: Perno
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: Lamiera
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false

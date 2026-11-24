@@ -15,6 +15,7 @@ struct SessioneView: View {
     let elimina: () -> Void
 
     @State private var correzione: Correzione?
+    @Environment(\.colorScheme) private var schema
     @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
@@ -432,7 +433,7 @@ struct SessioneView: View {
                 sfondo: .foglio, coloreEtichetta: .inchiostroTenue, coloreTesto: .inchiostro,
                 etichetta: setCorrente(SessionText.inProgress),
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
-                principale: DockSessione.Pulsante(titolo: setCorrente(SessionText.doneTitle), sfondo: .inchiostro, testo: .foglio) {
+                principale: DockSessione.Pulsante(titolo: setCorrente(SessionText.doneTitle), sfondo: .inchiostro, testo: .suInchiostro) {
                     sessione.setFatto()
                 },
                 bordoSopra: true)
@@ -519,7 +520,7 @@ struct SessioneView: View {
                         } label: {
                             Text(riserva.label)
                                 .font(.piastra(22))
-                                .foregroundStyle(scelta ? Color.foglio : Color.inchiostro)
+                                .foregroundStyle(scelta ? Color.suInchiostro : Color.inchiostro)
                                 .frame(maxWidth: .infinity, minHeight: 40)
                                 .background(scelta ? Color.inchiostro : Color.lamiera,
                                             in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -538,8 +539,13 @@ struct SessioneView: View {
         .padding(.trailing, 8)
         .padding(.bottom, 12)
         .background(Color.foglio, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(UIColor(hex: 0x1C2226)).opacity(0.24), radius: 16, x: 0, y: 12)
-        .shadow(color: Color(UIColor(hex: 0x1C2226)).opacity(0.16), radius: 4, x: 0, y: 2)
+        .overlay {
+            // Nel tema scuro l'avviso ha un bordo sottile per staccarsi dal dock.
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.inchiostro.opacity(schema == .dark ? 0.08 : 0), lineWidth: 1)
+        }
+        .shadow(color: Color.ombra.opacity(schema == .dark ? 0.5 : 0.24), radius: 16, x: 0, y: 12)
+        .shadow(color: Color.ombra.opacity(0.16), radius: 4, x: 0, y: 2)
         .padding(.horizontal, 16)
         .padding(.bottom, 236)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
