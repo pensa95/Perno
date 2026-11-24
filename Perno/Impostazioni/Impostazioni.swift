@@ -99,6 +99,8 @@ struct ImpostazioniView: View {
     @AppStorage(Impostazioni.passo) private var passo = PlateStep.standard
 
     @State private var unitaAperta = false
+    @State private var backupAperto = false
+    @Environment(Backup.self) private var backup
 
     var body: some View {
         ScrollView {
@@ -151,9 +153,16 @@ struct ImpostazioniView: View {
                             VocePila(titolo: "Unità e dischi", sottotitolo: Units.summary(unit: unita, step: passo))
                         }
                         .buttonStyle(.plain)
-                        VocePila(titolo: "Backup", sottotitolo: "Non ancora disponibile", freccia: false)
-                            .opacity(0.5)
-                            .accessibilityHint("Arriva in una delle prossime build")
+                        Button {
+                            backupAperto = true
+                        } label: {
+                            VocePila(titolo: "Backup",
+                                     sottotitolo: BackupText.settingsSummary(location: backup.posizione,
+                                                                             folder: backup.nomeCartella,
+                                                                             last: backup.ultimo,
+                                                                             failed: backup.fallito, now: .now))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -164,6 +173,7 @@ struct ImpostazioniView: View {
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $unitaAperta) { UnitaDischiView() }
+        .navigationDestination(isPresented: $backupAperto) { BackupView() }
         .onAppear { aspetto.controllaSistema() }
     }
 

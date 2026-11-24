@@ -23,6 +23,7 @@ struct HomeView: View {
     @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
 
     @Environment(\.modelContext) private var context
+    @Environment(Backup.self) private var backup
     @State private var sessioneDaAnnullare: WorkoutSession?
     @State private var impostazioniAperte = false
     /// Letta solo per ridisegnare i kg quando cambia l'unità.
@@ -103,6 +104,11 @@ struct HomeView: View {
                     .accessibilityLabel("Impostazioni")
                 }
                 .padding(.top, 4)
+
+                if backup.fallito {
+                    AvvisoBackup()
+                        .padding(.top, 20)
+                }
 
                 CalendarioSettimana(giorni: giorniCalendario)
                     .padding(.top, 28)
@@ -404,5 +410,6 @@ struct HomeView: View {
     NavigationStack {
         HomeView()
     }
+    .environment(Backup())
     .modelContainer(for: Routine.self, inMemory: true)
 }

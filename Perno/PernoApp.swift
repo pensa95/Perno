@@ -6,6 +6,7 @@ import Combine
 struct PernoApp: App {
     private let container: ModelContainer
     @State private var aspetto = Aspetto()
+    @State private var backup = Backup()
     @Environment(\.scenePhase) private var scenePhase
     /// Controllo periodico dell'aspetto dell'iPhone (chiaro/scuro automatico).
     private let orologioAspetto = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -25,6 +26,7 @@ struct PernoApp: App {
             // Il primo avvio (Benvenuto, cartella dei backup) arriva nella settimana 4.
             SezioniView()
                 .environment(aspetto)
+                .environment(backup)
                 .preferredColorScheme(aspetto.scelto)
                 .onReceive(orologioAspetto) { _ in aspetto.controllaSistema() }
         }
