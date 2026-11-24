@@ -41,13 +41,19 @@ extension WorkoutSession {
     }
 
     /// Set di lavoro fatti l'ultima volta per questo esercizio, in ordine (avvicinamenti esclusi).
+    /// Le volte in cui l'esercizio c'era ma nessun set è stato fatto (saltato, rimandato) non contano:
+    /// altrimenti la volta dopo l'obiettivo ripartirebbe da zero.
     static func ultimiSetDiLavoro(_ esercizio: Exercise) -> [(weight: Double, reps: Int)] {
-        let ultima = esercizio.sessionExercises
+        let volte = esercizio.sessionExercises
             .filter { $0.session?.endedAt != nil }
-            .max { ($0.session?.startedAt ?? .distantPast) < ($1.session?.startedAt ?? .distantPast) }
-        return (ultima?.orderedSets ?? []).compactMap { set -> (weight: Double, reps: Int)? in
-            guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
-            return (weight, reps)
+            .sorted { ($0.session?.startedAt ?? .distantPast) > ($1.session?.startedAt ?? .distantPast) }
+        for voce in volte {
+            let fatti = voce.orderedSets.compactMap { set -> (weight: Double, reps: Int)? in
+                guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
+                return (weight, reps)
+            }
+            if !fatti.isEmpty { return fatti }
         }
+        return []
     }
 }
