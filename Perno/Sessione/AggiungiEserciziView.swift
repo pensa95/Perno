@@ -107,7 +107,7 @@ struct AggiungiEserciziView: View {
                     if numero != nil {
                         Image(systemName: "checkmark")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.foglio)
+                            .foregroundStyle(Color.suInchiostro)
                             .frame(width: 26, height: 26)
                             .background(Color.inchiostro, in: Circle())
                     } else {

@@ -38,7 +38,7 @@ struct BarraSessione: View {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: 56)
                 .background(Color.foglio, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: Color.inchiostro.opacity(0.12), radius: 12, x: 0, y: 4)
+                .shadow(color: Color.ombra.opacity(0.12), radius: 12, x: 0, y: 4)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Sessione in corso, \(sessione.sessione.titolo), \(fase.etichetta) \(fase.tempo)")

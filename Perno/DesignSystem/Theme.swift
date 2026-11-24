@@ -20,6 +20,17 @@ extension Color {
     static let riscaldamentoTenue = Color.token(light: 0xFFE4D6, dark: 0xFFE4D6)
     static let errore = Color.token(light: 0xB3261E, dark: 0xF2867C)
 
+    // Derivati per il tema scuro (tavole «Home, scuro», «Set in corso, scuro», «Recupero, scuro»).
+    /// Testo e icone sopra un fondo inchiostro (pulsante «Set N fatto», scelte piene).
+    static let suInchiostro = Color.token(light: 0xFFFFFF, dark: 0x14181B)
+    /// Ombre: inchiostro nel chiaro, nero nello scuro (un'ombra chiara sembrerebbe un alone).
+    static let ombra = Color.token(light: 0x1C2226, dark: 0x000000)
+    /// Calendario: bordo tratteggiato di oggi, dei giorni in programma, dei giorni saltati, puntino del riposo.
+    static let bordoOggi = Color.token(light: 0x2A3136, dark: 0xEEF1F3)
+    static let bordoProgramma = Color.token(light: 0xA9B3BA, dark: 0x5A646B)
+    static let bordoSaltato = Color.token(light: 0x2A3136, dark: 0x9AA5AD)
+    static let puntoRiposo = Color.token(light: 0xA9B3BA, dark: 0x9AA5AD)
+
     static func token(light: UInt32, dark: UInt32) -> Color {
         Color(UIColor { traits in
             UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
