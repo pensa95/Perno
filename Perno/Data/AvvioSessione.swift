@@ -16,8 +16,9 @@ extension WorkoutSession {
             let piano = SessionPlanner.plan(
                 workSets: voce.setCount,
                 repsMin: voce.repsMin,
+                repsMax: voce.repsMax,
                 approaches: voce.approachCount,
-                previous: voce.exercise.map(ultimiSetDiLavoro) ?? [],
+                history: voce.exercise.map { storiaSetDiLavoro($0) } ?? [],
                 step: PlateStep.current
             )
             for (posizione, set) in piano.enumerated() {
@@ -38,6 +39,23 @@ extension WorkoutSession {
         context.insert(sessione)
         try? context.save()
         return sessione
+    }
+
+    /// Set di lavoro fatti nelle ultime volte (dalla più recente), con la riserva: servono ai
+    /// suggerimenti (`Progression`). Solo sessioni chiuse; le volte senza set fatti non contano.
+    static func storiaSetDiLavoro(_ esercizio: Exercise, volte: Int = 2) -> [[Progression.WorkSet]] {
+        esercizio.sessionExercises
+            .filter { $0.session?.endedAt != nil }
+            .sorted { ($0.session?.startedAt ?? .distantPast) > ($1.session?.startedAt ?? .distantPast) }
+            .map { voce in
+                voce.orderedSets.compactMap { set -> Progression.WorkSet? in
+                    guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
+                    return Progression.WorkSet(weight: weight, reps: reps, reserve: set.reserveRaw)
+                }
+            }
+            .filter { !$0.isEmpty }
+            .prefix(volte)
+            .map { $0 }
     }
 
     /// Set di lavoro fatti l'ultima volta per questo esercizio, in ordine (avvicinamenti esclusi).
