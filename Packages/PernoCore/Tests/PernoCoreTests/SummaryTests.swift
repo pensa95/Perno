@@ -60,8 +60,16 @@ final class SummaryTests: XCTestCase {
         XCTAssertEqual(fractions[.rest] ?? 0, 0.5, accuracy: 0.001)
         XCTAssertEqual(fractions.values.reduce(0, +), 1, accuracy: 0.001)
         XCTAssertEqual(SessionSummary.minutes(7 * 60 + 20), "7 min")
+        XCTAssertEqual(SessionSummary.partClock(7 * 60 + 20), "7:20")
+        XCTAssertEqual(SessionSummary.partClock(45), "0:45")
+        XCTAssertEqual(SessionSummary.partClock(3725), "1:02:05")
+        XCTAssertEqual(SessionSummary.spokenDuration(45), "45 secondi")
+        XCTAssertEqual(SessionSummary.spokenDuration(60), "1 minuto")
+        XCTAssertEqual(SessionSummary.spokenDuration(29 * 60 + 1), "29 minuti e 1 secondo")
         XCTAssertEqual(SessionSummary.accessibilityLabel(breakdown),
-                       "Riscaldamento 7, lavoro 12, recupero 29, cambi 10 minuti")
+                       "Riscaldamento 7 minuti, lavoro 12 minuti, recupero 29 minuti, cambi 10 minuti")
+        XCTAssertEqual(SessionSummary.accessibilityLabel(TimeBreakdown(warmUp: 0, work: 90, rest: 75, changeover: 0)),
+                       "Riscaldamento 0 secondi, lavoro 1 minuto e 30 secondi, recupero 1 minuto e 15 secondi, cambi 0 secondi")
         XCTAssertTrue(SessionSummary.fractions(TimeBreakdown(warmUp: 0, work: 0, rest: 0, changeover: 0)).isEmpty)
     }
 

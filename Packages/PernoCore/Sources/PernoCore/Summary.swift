@@ -114,13 +114,34 @@ public enum SessionSummary {
         "\(Int((max(0, seconds) / 60).rounded())) min"
     }
 
-    /// Etichetta per VoiceOver: «Riscaldamento 7, lavoro 12, recupero 29, cambi 10 minuti».
+    /// Tempo di una parte nella legenda, in minuti e secondi: «7:20», «0:45», «1:02:05».
+    public static func partClock(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds).rounded())
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+        func two(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
+        return hours > 0 ? "\(hours):\(two(minutes)):\(two(secs))" : "\(minutes):\(two(secs))"
+    }
+
+    /// Tempo di una parte per VoiceOver: «7 minuti e 20 secondi», «45 secondi», «1 minuto».
+    public static func spokenDuration(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds).rounded())
+        let minutes = total / 60
+        let secs = total % 60
+        let minText = minutes == 1 ? "1 minuto" : "\(minutes) minuti"
+        let secText = secs == 1 ? "1 secondo" : "\(secs) secondi"
+        if minutes == 0 { return secText }
+        if secs == 0 { return minText }
+        return "\(minText) e \(secText)"
+    }
+
+    /// Etichetta per VoiceOver: «Riscaldamento 7 minuti e 20 secondi, lavoro 12 minuti, …».
     public static func accessibilityLabel(_ breakdown: TimeBreakdown) -> String {
-        let parts = TimePart.allCases.map { part -> String in
-            let value = Int((seconds(part, in: breakdown) / 60).rounded())
+        TimePart.allCases.map { part -> String in
             let name = part == .warmUp ? part.label : part.label.lowercased()
-            return "\(name) \(value)"
+            return "\(name) \(spokenDuration(seconds(part, in: breakdown)))"
         }
-        return parts.joined(separator: ", ") + " minuti"
+        .joined(separator: ", ")
     }
 }
