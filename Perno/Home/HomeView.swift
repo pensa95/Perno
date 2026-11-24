@@ -17,6 +17,10 @@ struct HomeView: View {
     var apriSessione: () -> Void = {}
     /// «Chiudi e vai al riepilogo» sulla card della sessione interrotta.
     var apriRiepilogo: (WorkoutSession) -> Void = { _ in }
+    /// Card della sessione in corso nascosta durante l'animazione verso la barra ridotta (e ritorno).
+    var nascondiCardInCorso = false
+    /// Cornice della card della sessione in corso, per l'animazione verso la barra ridotta.
+    var misuraCardInCorso: (CGRect) -> Void = { _ in }
 
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
     @Query private var giorni: [PlanDay]
@@ -97,7 +101,11 @@ struct HomeView: View {
                     .padding(.top, 28)
 
                 if let viva = sessioneViva {
-                    sezione("Sessione in corso", sopra: 32) { cardInCorso(viva) }
+                    sezione("Sessione in corso", sopra: 32) {
+                        cardInCorso(viva)
+                            .misuraCornice(misuraCardInCorso)
+                            .opacity(nascondiCardInCorso ? 0 : 1)
+                    }
                 } else if let interrotta = sessioneInterrotta {
                     sezione("Sessione interrotta", sopra: 32) { cardInterrotta(interrotta) }
                     Text(ResumeText.footnote)
@@ -465,7 +473,7 @@ struct HomeView: View {
 }
 
 /// Colori ed etichetta della card «Sessione in corso»: gli stessi del dock nella fase di adesso.
-private struct FaseCard {
+struct FaseCard {
     let etichetta: String
     let sfondo: Color
     let testo: Color
