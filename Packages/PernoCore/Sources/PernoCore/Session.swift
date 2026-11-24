@@ -341,15 +341,18 @@ public enum SetCorrection {
     }
 
     /// −/+ sul peso: un passo dei dischi, senza uscire dai limiti.
+    /// Il conto si fa nell'unità in uso, così in libbre si resta sui multipli del passo.
     public static func stepWeight(_ weight: Double, by delta: Double) -> Double {
-        clampWeight(((weight + delta) * 100).rounded() / 100)
+        let unit = Units.unit
+        let shown = ((unit.fromKilograms(weight) + unit.fromKilograms(delta)) * 100).rounded() / 100
+        return clampWeight(unit.toKilograms(shown))
     }
 
     /// Peso scritto con il tastierino: «62,5» o «62.5». `nil` se non è un numero.
     public static func parseWeight(_ text: String) -> Double? {
         let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
         guard let value = Double(cleaned), value.isFinite else { return nil }
-        return clampWeight((value * 100).rounded() / 100)
+        return clampWeight(Units.unit.toKilograms((value * 100).rounded() / 100))
     }
 
     /// Ripetizioni scritte con il tastierino. `nil` se non è un numero intero.

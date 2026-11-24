@@ -21,7 +21,7 @@ struct CorreggiSetView: View {
     @State private var testo = ""
     @State private var chiediEliminazione = false
 
-    private let passo = PlateStep.standard
+    private let passo = PlateStep.current
 
     init(sessione: SessioneInCorso, esercizio: Int, indice: Int) {
         self.sessione = sessione
@@ -65,12 +65,13 @@ struct CorreggiSetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(spacing: 8) {
-                        blocco(titolo: "Peso, kg", valore: Weights.format(peso),
-                               meno: "Meno \(Weights.format(passo)) kg", piu: "Più \(Weights.format(passo)) kg",
+                        blocco(titolo: "Peso, \(Units.unit.symbol)", valore: Units.show(peso),
+                               meno: "Meno \(Weights.format(Units.step)) \(Units.unit.symbol)",
+                               piu: "Più \(Weights.format(Units.step)) \(Units.unit.symbol)",
                                menoAttivo: peso > SetCorrection.weights.lowerBound,
                                piuAttivo: peso < SetCorrection.weights.upperBound,
                                tocco: {
-                                   testo = Weights.format(peso)
+                                   testo = Units.show(peso)
                                    scriviPeso = true
                                },
                                cambia: { verso in peso = SetCorrection.stepWeight(peso, by: verso * passo) })
@@ -120,7 +121,7 @@ struct CorreggiSetView: View {
         .padding(.bottom, 12)
         .stileFoglio()
         .presentationDetents([.large])
-        .alert("Peso, kg", isPresented: $scriviPeso) {
+        .alert("Peso, \(Units.unit.symbol)", isPresented: $scriviPeso) {
             TextField("Peso", text: $testo)
                 .keyboardType(.decimalPad)
             Button("Annulla", role: .cancel) {}

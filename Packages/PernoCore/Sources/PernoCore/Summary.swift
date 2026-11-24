@@ -35,8 +35,8 @@ public enum SessionSummary {
 
         /// «55 × 10, massimale stimato 73 kg».
         public var detail: String {
-            let max = Int(lift.estimatedMax.rounded())
-            return "\(SessionText.weightReps(lift.weight, lift.reps)), massimale stimato \(max) kg"
+            let max = Int(Units.unit.fromKilograms(lift.estimatedMax).rounded())
+            return "\(SessionText.weightReps(lift.weight, lift.reps)), massimale stimato \(max) \(Units.unit.symbol)"
         }
     }
 

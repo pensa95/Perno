@@ -57,14 +57,14 @@ public enum SessionText {
 
     /// «62,5 × 10».
     public static func weightReps(_ weight: Double, _ reps: Int) -> String {
-        "\(Weights.format(weight)) × \(reps)"
+        "\(Units.show(weight)) × \(reps)"
     }
 
     /// «+2,5 kg» rispetto alla volta prima; `nil` se il peso non cambia.
     public static func delta(today: Double, before: Double) -> String? {
         let difference = today - before
         guard abs(difference) > 0.001 else { return nil }
-        return (difference > 0 ? "+" : "−") + Weights.format(abs(difference)) + " kg"
+        return (difference > 0 ? "+" : "−") + Units.show(abs(difference)) + " " + Units.unit.symbol
     }
 
     /// «Esercizio 1 di 5, da 8 a 12 ripetizioni».
@@ -95,6 +95,6 @@ public enum SessionText {
 extension SessionText {
     /// Avviso dopo «Set fatto»: «Set 1, 62,5 ×» (le ripetizioni sono nel −/+ accanto).
     public static func noticeTitle(_ kind: SetKind, _ number: Int, weight: Double) -> String {
-        "\(shortName(kind, number)), \(Weights.format(weight)) ×"
+        "\(shortName(kind, number)), \(Units.show(weight)) ×"
     }
 }

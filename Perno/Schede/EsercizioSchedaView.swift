@@ -128,7 +128,7 @@ struct EsercizioSchedaView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            aiuto(EntryHints.progression(repsMax: repsMax, step: PlateStep.standard))
+            aiuto(EntryHints.progression(repsMax: repsMax, step: Units.step, unit: Units.unit.symbol))
         }
     }
 

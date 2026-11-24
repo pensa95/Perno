@@ -18,7 +18,7 @@ extension WorkoutSession {
                 repsMin: voce.repsMin,
                 approaches: voce.approachCount,
                 previous: voce.exercise.map(ultimiSetDiLavoro) ?? [],
-                step: PlateStep.standard
+                step: PlateStep.current
             )
             for (posizione, set) in piano.enumerated() {
                 let registrato = SessionSet(position: posizione, kind: set.kind,

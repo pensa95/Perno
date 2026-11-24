@@ -176,7 +176,7 @@ public enum Cues {
     }
 }
 
-/// Passo dei dischi finché non c'è «Unità e dischi» nelle Impostazioni (settimana 4).
+/// Passo dei dischi predefinito (2,5); quello in uso è `PlateStep.current`, da «Unità e dischi».
 public enum PlateStep {
     public static let standard: Double = 2.5
 }

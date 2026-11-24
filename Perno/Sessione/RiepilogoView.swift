@@ -126,7 +126,7 @@ struct RiepilogoView: View {
         HStack(alignment: .top, spacing: 12) {
             numero(HomeText.duration(fine.timeIntervalSince(sessione.startedAt)), "durata")
             numero("\(sessione.setFatti)/\(sessione.setPrevisti)", "set")
-            numero(HomeText.volume(sessione.chiliSollevati), "kg",
+            numero(HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)), Units.unit.symbol,
                    variazione: SessionSummary.volumeChange(today: sessione.chiliSollevati,
                                                            previous: sessione.chiliVoltaScorsa))
         }

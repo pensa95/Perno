@@ -189,7 +189,8 @@ struct SezioniView: View {
     private func avvia(_ scheda: Routine) {
         guard sessione == nil, !scheda.entries.isEmpty else { return }
         let registro = WorkoutSession.avvia(da: scheda, in: context)
-        sessione = SessioneInCorso(sessione: registro, context: context)
+        sessione = SessioneInCorso(sessione: registro, riscaldamento: Impostazioni.riscaldamentoAttivo,
+                                   context: context)
         schermoSessione = true
     }
 
@@ -197,7 +198,8 @@ struct SezioniView: View {
     private func avviaLibera() {
         guard sessione == nil else { return }
         let registro = WorkoutSession.avviaLibera(in: context)
-        sessione = SessioneInCorso(sessione: registro, context: context)
+        sessione = SessioneInCorso(sessione: registro, riscaldamento: Impostazioni.riscaldamentoAttivo,
+                                   context: context)
         schermoSessione = true
     }
 
