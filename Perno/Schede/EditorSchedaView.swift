@@ -14,6 +14,7 @@ struct EditorSchedaView: View {
     @State private var esercizioAperto: RoutineEntry?
     @State private var libreriaAperta = false
     @State private var confermaElimina = false
+    @State private var pdf: FileDaCondividere?
 
     private var esercizi: [RoutineEntry] { scheda.orderedEntries }
 
@@ -107,7 +108,18 @@ struct EditorSchedaView: View {
         } message: {
             Text("Le sessioni già fatte restano nello storico.")
         }
+        .sheet(item: $pdf) { file in
+            FoglioCondivisione(url: file.url)
+                .presentationDetents([.medium, .large])
+        }
         .onDisappear(perform: salva)
+    }
+
+    /// «Esporta PDF»: foglio da stampare della scheda (righe vuote da compilare), poi il foglio di condivisione.
+    private func esportaPDF() {
+        salva()
+        let nome = PrintText.fileName(title: scheda.name.isEmpty ? "Scheda" : scheda.name, date: .now)
+        pdf = (try? FoglioPDF.crea(scheda.foglioDaStampare, nomeFile: nome)).map(FileDaCondividere.init)
     }
 
     private var testata: some View {
@@ -115,6 +127,7 @@ struct EditorSchedaView: View {
             PulsanteIndietro(titolo: "Schede") { dismiss() }
             Spacer()
             Menu {
+                Button("Esporta PDF", systemImage: "square.and.arrow.up", action: esportaPDF)
                 Button("Duplica scheda", action: duplica)
                 Button("Elimina scheda", role: .destructive) { confermaElimina = true }
             } label: {
@@ -124,7 +137,7 @@ struct EditorSchedaView: View {
                     .frame(width: 44, height: 44)
                     .background(Color.foglio, in: Circle())
             }
-            .accessibilityLabel("Altre azioni: duplica scheda, elimina scheda")
+            .accessibilityLabel("Altre azioni: esporta PDF, duplica scheda, elimina scheda")
         }
     }
 
