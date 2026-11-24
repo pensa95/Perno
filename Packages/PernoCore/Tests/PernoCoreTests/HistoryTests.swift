@@ -76,3 +76,24 @@ final class HistoryTests: XCTestCase {
         XCTAssertEqual(SessionHistory.months(items, year: 2025, calendar: calendar).map(\.title), ["Dicembre 2025"])
     }
 }
+
+final class SessionDetailTextTests: XCTestCase {
+    func testTexts() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        var parts = DateComponents()
+        parts.year = 2026
+        parts.month = 11
+        parts.day = 19
+        parts.hour = 18
+        parts.minute = 4
+        let start = calendar.date(from: parts)!
+        let end = start.addingTimeInterval(59 * 60)
+        XCTAssertEqual(SessionDetailText.when(start: start, end: end, calendar: calendar),
+                       "Giovedì 19 novembre, dalle 18:04 alle 19:03")
+        XCTAssertEqual(SessionDetailText.approaches([]), "Avvicinamento —")
+        XCTAssertEqual(SessionDetailText.reserve(.one), "riserva 1")
+        XCTAssertEqual(SessionDetailText.reserve(.fourOrMore), "riserva 4+")
+        XCTAssertNil(SessionDetailText.reserve(nil))
+    }
+}

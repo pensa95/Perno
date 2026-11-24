@@ -124,38 +124,13 @@ struct RiepilogoView: View {
 
     private var numeri: some View {
         HStack(alignment: .top, spacing: 12) {
-            numero(HomeText.duration(fine.timeIntervalSince(sessione.startedAt)), "durata")
-            numero("\(sessione.setFatti)/\(sessione.setPrevisti)", "set")
-            numero(HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)), Units.unit.symbol,
-                   variazione: SessionSummary.volumeChange(today: sessione.chiliSollevati,
-                                                           previous: sessione.chiliVoltaScorsa))
+            NumeroGrande(valore: HomeText.duration(fine.timeIntervalSince(sessione.startedAt)), etichetta: "durata")
+            NumeroGrande(valore: "\(sessione.setFatti)/\(sessione.setPrevisti)", etichetta: "set")
+            NumeroGrande(valore: HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)),
+                         etichetta: Units.unit.symbol,
+                         variazione: SessionSummary.volumeChange(today: sessione.chiliSollevati,
+                                                                 previous: sessione.chiliVoltaScorsa))
         }
-    }
-
-    private func numero(_ valore: String, _ etichetta: String, variazione: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(valore)
-                .font(.piastra(40))
-                .monospacedDigit()
-                .foregroundStyle(Color.inchiostro)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            HStack(spacing: 6) {
-                Text(etichetta)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.inchiostroTenue)
-                if let variazione {
-                    Text(variazione)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.inchiostro)
-                        .padding(.horizontal, 6)
-                        .frame(height: 20)
-                        .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .accessibilityLabel("\(variazione) sulla volta scorsa")
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Set non fatti e record
@@ -214,56 +189,9 @@ struct RiepilogoView: View {
     @ViewBuilder
     private var tempo: some View {
         let tempi = sessione.tempi
-        let frazioni = SessionSummary.fractions(tempi)
-        if !frazioni.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Tempo")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.inchiostro)
-                GeometryReader { geometria in
-                    let parti = SessionSummary.TimePart.allCases.filter { (frazioni[$0] ?? 0) > 0 }
-                    let spazio = geometria.size.width - CGFloat(max(0, parti.count - 1)) * 2
-                    HStack(spacing: 2) {
-                        ForEach(parti, id: \.self) { parte in
-                            Rectangle()
-                                .fill(colore(parte))
-                                .frame(width: max(0, spazio * (frazioni[parte] ?? 0)))
-                        }
-                    }
-                }
-                .frame(height: 16)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                .accessibilityElement()
-                .accessibilityLabel(SessionSummary.accessibilityLabel(tempi))
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12, alignment: .leading),
-                                    GridItem(.flexible(), spacing: 12, alignment: .leading)],
-                          alignment: .leading, spacing: 6) {
-                    ForEach(SessionSummary.TimePart.allCases, id: \.self) { parte in
-                        HStack(spacing: 6) {
-                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                .fill(colore(parte))
-                                .frame(width: 8, height: 8)
-                            Text(parte.label)
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(Color.inchiostroTenue)
-                            Text(SessionSummary.minutes(SessionSummary.seconds(parte, in: tempi)))
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Color.inchiostro)
-                        }
-                        .accessibilityHidden(true)
-                    }
-                }
-            }
-            .padding(.top, 28)
-        }
-    }
-
-    private func colore(_ parte: SessionSummary.TimePart) -> Color {
-        switch parte {
-        case .warmUp: return .riscaldamento
-        case .work: return .piastra
-        case .rest: return .recupero
-        case .changeover: return .piastraTenue
+        if !SessionSummary.fractions(tempi).isEmpty {
+            BarraTempo(tempi: tempi)
+                .padding(.top, 28)
         }
     }
 

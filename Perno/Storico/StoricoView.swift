@@ -5,6 +5,7 @@ import PernoCore
 /// Storico (tavola «L Sessioni»): selettore dell'anno, Sessioni / Esercizi, una lista sola con il mese
 /// come intestazione fissa, la settimana come separatore con il conteggio e il giorno a sinistra
 /// con più sessioni impilate. Riga = durata e set, coppa se c'è un record; niente volume.
+/// Il tocco su una riga apre il Dettaglio sessione.
 struct StoricoView: View {
     enum Vista: Hashable {
         case sessioni
@@ -12,6 +13,7 @@ struct StoricoView: View {
     }
 
     @Query(sort: \WorkoutSession.startedAt, order: .reverse) private var sessioni: [WorkoutSession]
+    @Environment(\.modelContext) private var context
     @State private var vista: Vista = .sessioni
     /// Anno scelto; `nil` = il più recente con sessioni.
     @State private var annoScelto: Int?
@@ -71,6 +73,19 @@ struct StoricoView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(for: UUID.self) { id in
+            if let sessione = sessioni.first(where: { $0.id == id }) {
+                DettaglioSessioneView(sessione: sessione) { elimina(sessione) }
+            }
+        }
+    }
+
+    /// Elimina dopo la chiusura del dettaglio (così nessuna vista legge una sessione eliminata).
+    private func elimina(_ sessione: WorkoutSession) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            context.delete(sessione)
+            try? context.save()
+        }
     }
 
     /// «2026 ⌄»: capsula bianca con il menu degli anni con sessioni.
@@ -191,6 +206,13 @@ struct StoricoView: View {
     }
 
     private func voceSessione(_ voce: SessionHistory.Item<UUID>) -> some View {
+        NavigationLink(value: voce.id) {
+            contenutoVoce(voce)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func contenutoVoce(_ voce: SessionHistory.Item<UUID>) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(voce.title)
@@ -207,6 +229,7 @@ struct StoricoView: View {
                     .foregroundStyle(Color.inchiostro)
                     .accessibilityLabel("Record")
             }
+            FrecciaVoce()
         }
         .vocePila(altezza: 56)
         .accessibilityElement(children: .combine)
