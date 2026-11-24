@@ -338,7 +338,9 @@ final class SessioneInCorso: Identifiable {
             context.insert(registrato)
             registrato.session = sessione
             let piano = SessionPlanner.plan(workSets: FreeSessionText.addedSets, repsMin: FreeSessionText.addedRepsMin,
-                                            approaches: 0, previous: precedenti, step: PlateStep.current)
+                                            repsMax: FreeSessionText.addedRepsMax, approaches: 0,
+                                            history: WorkoutSession.storiaSetDiLavoro(esercizio),
+                                            step: PlateStep.current)
             var sets: [SessionSet] = []
             for (posizione, pianificato) in piano.enumerated() {
                 let nuovo = SessionSet(position: posizione, kind: pianificato.kind,
