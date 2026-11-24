@@ -11,6 +11,8 @@ struct SchedeView: View {
     @Query private var esercizi: [Exercise]
     @State private var giornoAperto: GiornoScelto?
     @State private var nuovaScheda: Routine?
+    /// Vero per creare subito una scheda e aprire l'editor («Crea la prima scheda» del primo avvio).
+    var creaSubito: Binding<Bool> = .constant(false)
     @Environment(\.modelContext) private var context
 
     private struct GiornoScelto: Identifiable {
@@ -93,6 +95,14 @@ struct SchedeView: View {
         .navigationDestination(item: $nuovaScheda) { scheda in
             EditorSchedaView(scheda: scheda)
         }
+        .onAppear(perform: creaSeRichiesto)
+        .onChange(of: creaSubito.wrappedValue) { _, _ in creaSeRichiesto() }
+    }
+
+    private func creaSeRichiesto() {
+        guard creaSubito.wrappedValue else { return }
+        creaSubito.wrappedValue = false
+        creaScheda()
     }
 
     /// Crea una scheda vuota e apre l'editor.

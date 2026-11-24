@@ -34,6 +34,10 @@ struct SezioniView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(Backup.self) private var backup
     @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
+    @Query private var schede: [Routine]
+    @AppStorage("primoAvvio.fatto") private var primoAvvioFatto = false
+    /// «Crea la prima scheda» dal primo avvio: Schede crea la scheda e apre l'editor.
+    @State private var creaPrimaScheda = false
     @State private var sezione: Sezione = .allenati
     @State private var sessione: SessioneInCorso?
     @State private var schermoSessione = false
@@ -44,6 +48,36 @@ struct SezioniView: View {
     @State private var riepilogoInterrotta: WorkoutSession?
 
     var body: some View {
+        if mostraPrimoAvvio {
+            PrimoAvvioView(fine: finePrimoAvvio)
+        } else {
+            sezioni
+                .onAppear {
+                    // Chi aveva già dati prima del primo avvio non lo vede mai.
+                    if !primoAvvioFatto { primoAvvioFatto = true }
+                }
+        }
+    }
+
+    private var mostraPrimoAvvio: Bool {
+        FirstRun.shouldShow(done: primoAvvioFatto, hasRoutines: !schede.isEmpty, hasSessions: !sessioni.isEmpty)
+    }
+
+    private func finePrimoAvvio(_ fine: PrimoAvvioView.Fine) {
+        primoAvvioFatto = true
+        switch fine {
+        case .home:
+            sezione = .allenati
+        case .nuovaScheda:
+            sezione = .schede
+            creaPrimaScheda = true
+        case .sessioneLibera:
+            sezione = .allenati
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { avviaLibera() }
+        }
+    }
+
+    private var sezioni: some View {
         TabView(selection: $sezione) {
             NavigationStack {
                 HomeView(sessioneViva: sessione,
@@ -56,7 +90,7 @@ struct SezioniView: View {
             }
             .tabItem { Label(Sezione.allenati.titolo, systemImage: Sezione.allenati.icona) }
             .tag(Sezione.allenati)
-            NavigationStack { SchedeView() }
+            NavigationStack { SchedeView(creaSubito: $creaPrimaScheda) }
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.schede.titolo, systemImage: Sezione.schede.icona) }
                 .tag(Sezione.schede)

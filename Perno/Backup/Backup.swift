@@ -156,10 +156,43 @@ final class Backup {
         return url
     }
 
+    // MARK: Copie nella cartella (primo avvio)
+
+    /// Backup di Perno nella cartella scelta, dal più recente; vuoto se non si può leggere.
+    func copieInCartella() -> [String] {
+        guard let cartella = try? cartellaRisolta(), cartella.startAccessingSecurityScopedResource() else { return [] }
+        defer { cartella.stopAccessingSecurityScopedResource() }
+        let presenti = (try? FileManager.default.contentsOfDirectory(atPath: cartella.path)) ?? []
+        return BackupFiles.backups(in: presenti.map(Self.nomePulito))
+    }
+
+    /// Legge una copia della cartella scelta (la scarica da iCloud se serve).
+    func leggiCopia(_ nome: String) throws -> BackupFile {
+        let cartella = try cartellaRisolta()
+        guard cartella.startAccessingSecurityScopedResource() else { throw CocoaError(.fileReadNoPermission) }
+        defer { cartella.stopAccessingSecurityScopedResource() }
+        return try Self.leggiFile(cartella.appendingPathComponent(nome))
+    }
+
+    private func cartellaRisolta() throws -> URL {
+        guard let segnalibro = difese.data(forKey: Chiave.cartella) else { throw CocoaError(.fileNoSuchFile) }
+        var vecchio = false
+        let cartella = try URL(resolvingBookmarkData: segnalibro, bookmarkDataIsStale: &vecchio)
+        if vecchio, cartella.startAccessingSecurityScopedResource() {
+            if let nuovo = try? cartella.bookmarkData() { difese.set(nuovo, forKey: Chiave.cartella) }
+            cartella.stopAccessingSecurityScopedResource()
+        }
+        return cartella
+    }
+
     /// Legge un backup scelto dall'app File.
     static func leggi(_ url: URL) throws -> BackupFile {
         let accesso = url.startAccessingSecurityScopedResource()
         defer { if accesso { url.stopAccessingSecurityScopedResource() } }
+        return try leggiFile(url)
+    }
+
+    private static func leggiFile(_ url: URL) throws -> BackupFile {
         var erroreCoordinamento: NSError?
         var risultato: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
         NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &erroreCoordinamento) { origine in

@@ -102,3 +102,29 @@ final class BackupTests: XCTestCase {
                        "Nessuna cartella scelta")
     }
 }
+
+final class FirstRunTests: XCTestCase {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Rome")!
+        return calendar
+    }
+
+    func testShownOnlyToAnEmptyApp() {
+        XCTAssertTrue(FirstRun.shouldShow(done: false, hasRoutines: false, hasSessions: false))
+        XCTAssertFalse(FirstRun.shouldShow(done: true, hasRoutines: false, hasSessions: false))
+        XCTAssertFalse(FirstRun.shouldShow(done: false, hasRoutines: true, hasSessions: false))
+        XCTAssertFalse(FirstRun.shouldShow(done: false, hasRoutines: false, hasSessions: true))
+    }
+
+    func testTexts() {
+        let copy = calendar.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 18, minute: 2))!
+        let oldest = calendar.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 9))!
+        XCTAssertEqual(BackupText.found(folder: "Palestra"), "Nella cartella Palestra c'è una copia dei tuoi dati.")
+        XCTAssertEqual(BackupText.copyDate(copy, calendar: calendar), "Giovedì 19 novembre, 18:02")
+        XCTAssertEqual(BackupText.otherCopies(2, oldest: oldest, calendar: calendar),
+                       "Ce ne sono altre 2, la più vecchia del 16 novembre")
+        XCTAssertEqual(BackupText.otherCopies(1, oldest: oldest, calendar: calendar), "Ce n'è un'altra, del 16 novembre")
+        XCTAssertNil(BackupText.otherCopies(0, oldest: nil, calendar: calendar))
+    }
+}

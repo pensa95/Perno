@@ -343,3 +343,33 @@ public enum BackupText {
                 count(file.exercises.count, "esercizio", "esercizi")].joined(separator: ", ")
     }
 }
+
+// MARK: - Primo avvio
+
+public enum FirstRun {
+    /// Il primo avvio si mostra solo a un'app vuota (niente schede né sessioni): chi aveva già
+    /// dati prima di questa versione non lo vede.
+    public static func shouldShow(done: Bool, hasRoutines: Bool, hasSessions: Bool) -> Bool {
+        !done && !hasRoutines && !hasSessions
+    }
+}
+
+extension BackupText {
+    /// «Nella cartella Palestra c'è una copia dei tuoi dati.»
+    public static func found(folder: String) -> String {
+        "Nella cartella \(folder) c'è una copia dei tuoi dati."
+    }
+
+    /// «Giovedì 19 novembre, 18:02».
+    public static func copyDate(_ date: Date, calendar: Calendar = .current) -> String {
+        "\(ItalianDate.long(date, calendar: calendar)), \(ResumeText.time(date, calendar: calendar))"
+    }
+
+    /// «Ce ne sono altre 2, la più vecchia del 16 novembre»; `nil` senza altre copie.
+    public static func otherCopies(_ count: Int, oldest: Date?, calendar: Calendar = .current) -> String? {
+        guard count > 0 else { return nil }
+        guard let oldest else { return count == 1 ? "Ce n'è un'altra" : "Ce ne sono altre \(count)" }
+        let day = dayMonth(oldest, calendar: calendar)
+        return count == 1 ? "Ce n'è un'altra, del \(day)" : "Ce ne sono altre \(count), la più vecchia del \(day)"
+    }
+}
