@@ -15,6 +15,8 @@ struct HomeView: View {
     var riprendi: (WorkoutSession) -> Void = { _ in }
     /// Riapre la schermata della sessione ridotta.
     var apriSessione: () -> Void = {}
+    /// «Chiudi e vai al riepilogo» sulla card della sessione interrotta.
+    var apriRiepilogo: (WorkoutSession) -> Void = { _ in }
 
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
     @Query private var giorni: [PlanDay]
@@ -222,7 +224,7 @@ struct HomeView: View {
             }
             PulsanteGiallo(titolo: "Riprendi sessione") { riprendi(sessione) }
             Button {
-                chiudiInterrotta(sessione)
+                apriRiepilogo(sessione)
             } label: {
                 Text("Chiudi e vai al riepilogo")
                     .font(.body.weight(.semibold))
@@ -267,15 +269,6 @@ struct HomeView: View {
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.foglio, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-    }
-
-    /// «Chiudi e vai al riepilogo»: il riepilogo arriva nella settimana 4; per ora la sessione si
-    /// chiude all'ultimo «Set fatto» e va nello storico.
-    private func chiudiInterrotta(_ sessione: WorkoutSession) {
-        let ultimo = sessione.exercises.flatMap(\.sets).compactMap(\.endedAt).max()
-        sessione.endedAt = ultimo ?? sessione.lastActivityAt
-        sessione.isSaved = true
-        try? context.save()
     }
 
     private func cardDaFare(_ scheda: Routine) -> some View {

@@ -185,13 +185,13 @@ public struct SessionMachine: Sendable {
             startedAt: since,
             endedAt: now
         ))
-        setIndex += 1
-        if setIndex < exercises[exerciseIndex].sets.count {
+        // Il prossimo set non ancora fatto (dopo «Elimina set» o «Completa» ci possono essere set
+        // già fatti più avanti); finiti i set, il prossimo esercizio con set da fare.
+        if let next = firstUndoneSet(of: exerciseIndex, after: setIndex) {
+            setIndex = next
             phase = .rest(since: now)
         } else {
-            position += 1
-            setIndex = 0
-            phase = position < order.count || isOpenEnded ? .changeover(since: now) : .finished
+            moveToNextExercise(at: now)
         }
     }
 
@@ -276,7 +276,8 @@ extension SessionMachine {
         case .rest:
             previousPosition = position
         case .changeover, .finished:
-            previousPosition = position - 1
+            // Dopo l'ultimo set si salta agli esercizi con set da fare: si torna a quello del set.
+            previousPosition = order[..<min(position, order.count)].lastIndex(of: last.exerciseIndex) ?? -1
         default:
             throw SessionError.invalidTransition
         }
@@ -533,5 +534,46 @@ extension SessionMachine {
         exercises[exercise].sets.append(PlannedSet(kind: .work, weight: model?.weight ?? 0,
                                                    reps: model?.reps ?? FreeSessionText.addedRepsMin))
         return exercises[exercise].sets.count - 1
+    }
+}
+
+// MARK: - «Completa» dal riepilogo
+
+extension SessionMachine {
+    /// Primo set non fatto di un esercizio dopo `index` (escluso); `nil` se sono tutti fatti.
+    public func firstUndoneSet(of exercise: Int, after index: Int = -1) -> Int? {
+        guard exercises.indices.contains(exercise) else { return nil }
+        return exercises[exercise].sets.indices.first { $0 > index && !isDone(exercise: exercise, set: $0) }
+    }
+
+    /// «Completa» nel riepilogo: l'esercizio diventa quello di adesso, dal primo set non fatto, con
+    /// il cambio esercizio da adesso. Gli altri esercizi con set da fare restano dopo, nello stesso
+    /// ordine. Se l'esercizio è già quello di adesso, la sessione riprende da dove era.
+    public mutating func complete(exercise: Int, at now: Date) throws {
+        guard let first = firstUndoneSet(of: exercise) else { throw SessionError.invalidTransition }
+        if exercise == currentExerciseIndex && phase != .finished { return }
+        if let index = order.firstIndex(of: exercise) {
+            order.remove(at: index)
+            if index < position { position -= 1 }
+        }
+        position = min(position, order.count)
+        order.insert(exercise, at: position)
+        setIndex = first
+        phase = .changeover(since: now)
+    }
+
+    /// Dopo l'ultimo set di un esercizio: il prossimo esercizio con set da fare (dal primo non fatto).
+    mutating func moveToNextExercise(at now: Date) {
+        position += 1
+        while position < order.count, firstUndoneSet(of: order[position]) == nil {
+            position += 1
+        }
+        if position < order.count, let first = firstUndoneSet(of: order[position]) {
+            setIndex = first
+            phase = .changeover(since: now)
+        } else {
+            setIndex = 0
+            phase = isOpenEnded ? .changeover(since: now) : .finished
+        }
     }
 }
