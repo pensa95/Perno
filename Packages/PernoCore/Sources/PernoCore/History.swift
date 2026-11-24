@@ -312,6 +312,18 @@ public enum ExerciseHistory {
     public static func stallText(weeks: Int) -> String {
         "fermo da \(weeks) settimane"
     }
+
+    /// Proposta di settimana di scarico per un esercizio fermo: titolo e spiegazione con il peso
+    /// suggerito (90% del peso dell'ultima volta, arrotondato al passo dei dischi).
+    public static func deloadAdvice(weeks: Int, lastWeight: Double, step: Double) -> (title: String, detail: String) {
+        let lighter = Weights.round(lastWeight * Progression.deloadFactor, step: step)
+        let title = "Fermo da \(weeks) settimane"
+        guard lastWeight > 0, lighter < lastWeight - 0.001 else {
+            return (title, "Prova una settimana di scarico, con meno peso, poi riparti.")
+        }
+        let symbol = Units.unit.symbol
+        return (title, "Prova una settimana di scarico: \(Units.show(lighter)) \(symbol) invece di \(Units.show(lastWeight)) \(symbol), stesse ripetizioni. Poi riparti dal peso di prima.")
+    }
 }
 
 // MARK: - Dettaglio esercizio

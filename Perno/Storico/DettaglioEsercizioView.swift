@@ -54,6 +54,7 @@ struct DettaglioEsercizioView: View {
                     bloccoRecord(migliore.lift, data: migliore.date).padding(.top, 20)
                 }
                 numeri(storico).padding(.top, 16)
+                scarico(storico)
                 grafico(storico).padding(.top, 28)
                 sezioneRegolazioni
                 sessioni(volte, record: record)
@@ -136,6 +137,39 @@ struct DettaglioEsercizioView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Stallo
+
+    /// Esercizio fermo da almeno 3 settimane: proposta di una settimana di scarico.
+    @ViewBuilder
+    private func scarico(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
+        if let settimane = storico.stalledWeeks(today: .now), let ultima = storico.last {
+            let proposta = ExerciseHistory.deloadAdvice(weeks: settimane, lastWeight: ultima.lift.weight,
+                                                        step: PlateStep.current)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "arrow.down.right")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.inchiostro)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(proposta.title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                    Text(proposta.detail)
+                        .font(.footnote)
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 12)
+            .padding(.leading, 16)
+            .padding(.trailing, 12)
+            .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .padding(.top, 16)
+        }
     }
 
     // MARK: Grafico
