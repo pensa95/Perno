@@ -69,7 +69,23 @@ extension UIColor {
 extension Font {
     /// Numeri e titoli in Barlow Condensed (OFL, file in `Perno/Resources/Fonts`, registrati con
     /// `UIAppFonts`). Semibold di default, come nelle tavole; `.medium` per i pesi 500.
+    /// Crescono con Dynamic Type («Testo più grande») seguendo lo stile di sistema più vicino, così i
+    /// numeri grandi crescono meno dei testi piccoli. Restano fissi da 60 pt in su (3-2-1, timer del
+    /// dock, marchio) e nella Live Activity, che ha spazi fissi.
     static func piastra(_ size: CGFloat, peso: Font.Weight = .semibold) -> Font {
-        .custom(peso == .medium ? "BarlowCondensed-Medium" : "BarlowCondensed-SemiBold", fixedSize: size)
+        let nome = peso == .medium ? "BarlowCondensed-Medium" : "BarlowCondensed-SemiBold"
+        #if WIDGET
+        return .custom(nome, fixedSize: size)
+        #else
+        guard size < 60 else { return .custom(nome, fixedSize: size) }
+        return .custom(nome, size: size, relativeTo: stilePiastra(size))
+        #endif
+    }
+
+    private static func stilePiastra(_ size: CGFloat) -> Font.TextStyle {
+        if size >= 34 { return .largeTitle }
+        if size >= 28 { return .title }
+        if size >= 20 { return .title2 }
+        return .title3
     }
 }

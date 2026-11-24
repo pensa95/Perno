@@ -164,16 +164,21 @@ struct PulsanteGiallo: View {
     var attivo = true
     let azione: () -> Void
 
+    /// 19 pt come nelle tavole, che crescono con «Testo più grande».
+    @ScaledMetric(relativeTo: .title3) private var dimensione: CGFloat = 19
+
     var body: some View {
         Button(action: azione) {
             HStack(spacing: 8) {
                 if let icona {
                     Image(systemName: icona)
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(.system(size: dimensione, weight: .semibold))
                 }
                 Text(titolo)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: dimensione, weight: .semibold))
+                    .multilineTextAlignment(.center)
             }
+                .padding(.horizontal, 16)
                 .foregroundStyle(Color.suPerno)
                 .frame(maxWidth: .infinity, minHeight: 64)
                 .background(Color.perno, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -444,7 +449,7 @@ struct CalendarioSettimana: View {
             ForEach(giorni, id: \.weekday) { giorno in
                 VStack(spacing: 6) {
                     Text(WeekCalendar.letter(giorno.weekday))
-                        .font(.system(size: 13, weight: giorno.isToday ? .semibold : .medium))
+                        .font(.footnote.weight(giorno.isToday ? .semibold : .medium))
                         .foregroundStyle(giorno.isToday ? Color.foglio : Color.inchiostroTenue)
                         .frame(minWidth: 26, minHeight: 24)
                         .padding(.horizontal, 4)
@@ -452,16 +457,19 @@ struct CalendarioSettimana: View {
                     casella(giorno)
                         .frame(width: 36, height: 36)
                     Text(giorno.label)
-                        .font(.system(size: 12, weight: giorno.isToday ? .semibold : .medium))
+                        .font(.caption.weight(giorno.isToday ? .semibold : .medium))
                         .foregroundStyle(giorno.isToday ? Color.inchiostro : Color.inchiostroTenue)
                         .lineLimit(1)
-                        .frame(height: 16)
+                        .frame(minHeight: 16)
                 }
                 .frame(maxWidth: .infinity)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(descrizione(giorno))
             }
         }
+        // La linea è all'altezza del centro delle caselle, sotto la lettera alta 24 pt: oltre
+        // xxxLarge la lettera crescerebbe e la linea non sarebbe più al centro.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .background(alignment: .top) {
             // Linea che unisce i giorni, all'altezza del centro delle caselle (24 + 6 + 18):
             // un tratto tra un giorno e l'altro, che si ferma a `stacco` dai quadrati e dai puntini.

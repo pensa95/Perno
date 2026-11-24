@@ -20,6 +20,9 @@ struct SessioneView: View {
     @Environment(\.colorScheme) private var schema
     @Environment(\.accessibilityReduceMotion) private var menoMovimento
     @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
+    /// Regolazioni (15 pt, 18 pt in evidenza) e icone accanto: crescono con «Testo più grande».
+    @ScaledMetric(relativeTo: .subheadline) private var dimensioneRegolazioni: CGFloat = 15
+    @ScaledMetric(relativeTo: .title3) private var dimensioneRegolazioniEvidenza: CGFloat = 18
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
@@ -422,9 +425,10 @@ struct SessioneView: View {
                 if !setup.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "wrench.adjustable")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: dimensioneRegolazioni, weight: .semibold))
                         Text(setup)
-                            .font(.system(size: inEvidenza ? 18 : 15, weight: .semibold))
+                            .font(.system(size: inEvidenza ? dimensioneRegolazioniEvidenza : dimensioneRegolazioni,
+                                          weight: .semibold))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .foregroundStyle(Color.inchiostro)
@@ -432,7 +436,7 @@ struct SessioneView: View {
                 ForEach(promemoria, id: \.self) { voce in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "pin")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: dimensioneRegolazioni, weight: .semibold))
                         Text(voce)
                             .font(.subheadline)
                             .fixedSize(horizontal: false, vertical: true)
@@ -442,7 +446,7 @@ struct SessioneView: View {
                 if !nota.isEmpty {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "text.bubble")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: dimensioneRegolazioni, weight: .semibold))
                         Text(nota)
                             .font(.subheadline)
                             .fixedSize(horizontal: false, vertical: true)
