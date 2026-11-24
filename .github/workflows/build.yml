@@ -67,6 +67,17 @@ jobs:
           done
           plutil -extract UIAppFonts json -o - "$APP/Info.plist"
 
+      - name: Verifica la Live Activity nell'app
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Perno.app
+          EXT="$APP/PlugIns/PernoWidget.appex"
+          test -d "$EXT" || { echo "Manca PernoWidget.appex in PlugIns"; exit 1; }
+          plutil -extract NSSupportsLiveActivities raw -o - "$APP/Info.plist"
+          plutil -extract NSExtension.NSExtensionPointIdentifier raw -o - "$EXT/Info.plist"
+          for f in BarlowCondensed-Medium.ttf BarlowCondensed-SemiBold.ttf; do
+            test -f "$EXT/$f" || { echo "Manca $f nell'estensione"; exit 1; }
+          done
+
       - name: Crea Perno.ipa
         run: |
           mkdir -p Payload

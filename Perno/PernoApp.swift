@@ -14,6 +14,8 @@ struct PernoApp: App {
     init() {
         Impostazioni.registraPredefiniti()
         Impostazioni.applicaUnita()
+        // Pulsanti della Live Activity: il gestore deve esserci anche se l'app parte in background.
+        _ = AttivitaLive.shared
         do {
             container = try PernoStore.makeContainer()
         } catch {
