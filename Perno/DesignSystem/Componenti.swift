@@ -435,7 +435,7 @@ struct CalendarioSettimana: View {
     let giorni: [CalendarDay]
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: spaziatura) {
             ForEach(giorni, id: \.weekday) { giorno in
                 VStack(spacing: 6) {
                     Text(WeekCalendar.letter(giorno.weekday))
@@ -458,14 +458,35 @@ struct CalendarioSettimana: View {
             }
         }
         .background(alignment: .top) {
-            // Linea che unisce i giorni, all'altezza del centro delle caselle (24 + 6 + 18).
+            // Linea che unisce i giorni, all'altezza del centro delle caselle (24 + 6 + 18):
+            // un tratto tra un giorno e l'altro, che si ferma a `stacco` dai quadrati e dai puntini.
             GeometryReader { geo in
-                Rectangle()
-                    .fill(Color.linea)
-                    .frame(width: geo.size.width * 0.86, height: 1)
-                    .position(x: geo.size.width / 2, y: 48)
+                let n = giorni.count
+                let colonna = (geo.size.width - spaziatura * CGFloat(max(n - 1, 0))) / CGFloat(max(n, 1))
+                Path { tracciato in
+                    guard n > 1 else { return }
+                    for i in 0..<(n - 1) {
+                        let centro = CGFloat(i) * (colonna + spaziatura) + colonna / 2
+                        let prossimo = centro + colonna + spaziatura
+                        let da = centro + metaIngombro(giorni[i]) + stacco
+                        let a = prossimo - metaIngombro(giorni[i + 1]) - stacco
+                        guard a > da else { continue }
+                        tracciato.move(to: CGPoint(x: da, y: 48))
+                        tracciato.addLine(to: CGPoint(x: a, y: 48))
+                    }
+                }
+                .stroke(Color.linea, lineWidth: 1)
             }
         }
+    }
+
+    private let spaziatura: CGFloat = 4
+    /// Spazio tra la linea e il quadrato o il puntino (uguale per tutti i giorni).
+    private let stacco: CGFloat = 5
+
+    /// Metà della larghezza di quello che c'è al centro della colonna: quadrato 36, puntino 4.
+    private func metaIngombro(_ giorno: CalendarDay) -> CGFloat {
+        giorno.status == .rest ? 2 : 18
     }
 
     @ViewBuilder
@@ -485,14 +506,10 @@ struct CalendarioSettimana: View {
         case .planned:
             forma.fill(giorno.isToday ? Color.foglio : Color.lamiera)
                 .overlay {
-                    forma.strokeBorder(giorno.isToday ? Color.bordoOggi : Color.bordoProgramma,
-                                       style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                    BordoTratteggiato(colore: giorno.isToday ? Color.bordoOggi : Color.bordoProgramma)
                 }
         case .rest:
-            ZStack {
-                Rectangle().fill(Color.lamiera).frame(width: 18, height: 12)
-                Circle().fill(Color.puntoRiposo).frame(width: 4, height: 4)
-            }
+            Circle().fill(Color.puntoRiposo).frame(width: 4, height: 4)
         }
     }
 
@@ -506,5 +523,90 @@ struct CalendarioSettimana: View {
         }
         let nome = giorno.label.isEmpty ? "" : "\(giorno.label), "
         return "\(Weekday.name(giorno.weekday)): \(nome)\(stato)"
+    }
+}
+
+// MARK: - Bordo tratteggiato
+
+/// Bordo tratteggiato di un quadrato arrotondato (come `strokeBorder`), con trattino e spazio
+/// adattati perché il perimetro contenga un numero intero di periodi: il tratteggio resta uguale
+/// anche dove il tracciato si chiude, senza un pezzo più corto.
+struct BordoTratteggiato: View {
+    let colore: Color
+    var spessore: CGFloat = 2
+    var trattino: CGFloat = 4
+    var spazio: CGFloat = 3
+    var raggio: CGFloat = 8
+
+    var body: some View {
+        GeometryReader { geo in
+            let rettangolo = CGRect(origin: .zero, size: geo.size)
+                .insetBy(dx: spessore / 2, dy: spessore / 2)
+            let percorso = RoundedRectangle(cornerRadius: max(raggio - spessore / 2, 0), style: .continuous)
+                .path(in: rettangolo)
+            let lunghezza = percorso.lunghezza
+            let periodo = trattino + spazio
+            let periodi = max((lunghezza / periodo).rounded(), 1)
+            let scala = lunghezza > 0 ? lunghezza / (periodi * periodo) : 1
+            percorso.stroke(colore, style: StrokeStyle(
+                lineWidth: spessore,
+                dash: [trattino * scala, spazio * scala],
+                dashPhase: trattino * scala / 2
+            ))
+        }
+    }
+}
+
+extension Path {
+    /// Lunghezza del tracciato; le curve sono misurate su 24 punti.
+    var lunghezza: CGFloat {
+        var totale: CGFloat = 0
+        var corrente = CGPoint.zero
+        var inizio = CGPoint.zero
+        let passi = 24
+
+        func distanza(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+            hypot(b.x - a.x, b.y - a.y)
+        }
+
+        forEach { elemento in
+            switch elemento {
+            case .move(let punto):
+                corrente = punto
+                inizio = punto
+            case .line(let punto):
+                totale += distanza(corrente, punto)
+                corrente = punto
+            case .quadCurve(let punto, let controllo):
+                var precedente = corrente
+                for passo in 1...passi {
+                    let t = CGFloat(passo) / CGFloat(passi)
+                    let u = 1 - t
+                    let x = u * u * corrente.x + 2 * u * t * controllo.x + t * t * punto.x
+                    let y = u * u * corrente.y + 2 * u * t * controllo.y + t * t * punto.y
+                    let nuovo = CGPoint(x: x, y: y)
+                    totale += distanza(precedente, nuovo)
+                    precedente = nuovo
+                }
+                corrente = punto
+            case .curve(let punto, let controllo1, let controllo2):
+                var precedente = corrente
+                for passo in 1...passi {
+                    let t = CGFloat(passo) / CGFloat(passi)
+                    let u = 1 - t
+                    let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t
+                    let x = a * corrente.x + b * controllo1.x + c * controllo2.x + d * punto.x
+                    let y = a * corrente.y + b * controllo1.y + c * controllo2.y + d * punto.y
+                    let nuovo = CGPoint(x: x, y: y)
+                    totale += distanza(precedente, nuovo)
+                    precedente = nuovo
+                }
+                corrente = punto
+            case .closeSubpath:
+                totale += distanza(corrente, inizio)
+                corrente = inizio
+            }
+        }
+        return totale
     }
 }
