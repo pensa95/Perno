@@ -76,7 +76,8 @@ struct BarraTempo: View {
                         Text(parte.label)
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(Color.inchiostroTenue)
-                        Text(SessionSummary.minutes(SessionSummary.seconds(parte, in: tempi)))
+                        Text(SessionSummary.partClock(SessionSummary.seconds(parte, in: tempi)))
+                            .monospacedDigit()
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(Color.inchiostro)
                     }

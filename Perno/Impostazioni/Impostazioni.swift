@@ -293,7 +293,7 @@ struct TestataImpostazioni: View {
     }
 }
 
-/// Voce della pila con titolo, sottotitolo e interruttore di sistema.
+/// Voce della pila con titolo, sottotitolo e interruttore.
 struct Interruttore: View {
     let titolo: String
     let sottotitolo: String
@@ -311,10 +311,39 @@ struct Interruttore: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .tint(Color.inchiostro)
+        .toggleStyle(StileInterruttore())
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 60)
         .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// Interruttore con le misure di quello di sistema (51 × 31). Acceso: binario inchiostro e pallino
+/// `suInchiostro`, così resta leggibile anche nel tema scuro (dove l'inchiostro è quasi bianco e il
+/// pallino bianco di sistema spariva). Spento: binario grigio e pallino bianco, come quello di sistema.
+struct StileInterruttore: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        let acceso = configuration.isOn
+        HStack(spacing: 12) {
+            configuration.label
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ZStack(alignment: acceso ? .trailing : .leading) {
+                Capsule()
+                    .fill(acceso ? Color.inchiostro : Color.inchiostroTenue.opacity(0.32))
+                Circle()
+                    .fill(acceso ? Color.suInchiostro : Color.white)
+                    .shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
+                    .padding(2)
+            }
+            .frame(width: 51, height: 31)
+            .animation(.snappy(duration: 0.22), value: acceso)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { configuration.isOn.toggle() }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(acceso ? "Attivo" : "Disattivo")
+        .accessibilityAction { configuration.isOn.toggle() }
     }
 }
