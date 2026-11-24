@@ -256,9 +256,7 @@ struct InArrivoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(titolo)
-                .font(.piastra(40))
-                .foregroundStyle(Color.inchiostro)
+            TestataSezione(titolo: titolo)
             Text("Arriva in una delle prossime build.")
                 .font(.body)
                 .foregroundStyle(Color.inchiostroTenue)
@@ -266,7 +264,7 @@ struct InArrivoView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .padding(.top, 8)
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
     }
