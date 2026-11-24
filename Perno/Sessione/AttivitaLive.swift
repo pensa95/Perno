@@ -93,19 +93,18 @@ final class AttivitaLive {
     }
 
     /// «Inizia set» dal blocco schermo: con l'app sospesa la schermata della sessione non gira,
-    /// quindi il 3-2-1 lo porta a termine l'azione stessa (bip ogni secondo, poi parte il set).
+    /// quindi il 3-2-1 lo porta a termine l'azione stessa. I bip vanno in coda tutti insieme
+    /// (audio in background): mentre suonano l'app resta sveglia e allo zero fa partire il set.
     private func contoAllaRovescia(_ sessione: SessioneInCorso) async {
         guard case let .countdown(dal, _, _) = sessione.fase else { return }
         let totale = sessione.secondiContoAllaRovescia
-        for passo in 0..<totale where totale - passo <= 3 {
-            await aspetta(fino: dal.addingTimeInterval(TimeInterval(passo)))
-            guard case let .countdown(ancora, _, _) = sessione.fase, ancora == dal else { return }
-            Segnali.shared.secondo()
-        }
         let fine = dal.addingTimeInterval(TimeInterval(totale))
+        Segnali.shared.sequenza(bip: Segnali.ultimiTre(prima: fine, durata: totale), via: fine)
         await aspetta(fino: fine)
-        guard case let .countdown(ancora, _, _) = sessione.fase, ancora == dal else { return }
-        Segnali.shared.via()
+        guard case let .countdown(ancora, _, _) = sessione.fase, ancora == dal else {
+            Segnali.shared.ferma(via: fine)
+            return
+        }
         sessione.contoAllaRovesciaFinito(alle: fine)
     }
 

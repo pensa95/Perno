@@ -237,34 +237,98 @@ struct HomeView: View {
         .background(Color.foglio, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
-    /// Card della sessione ridotta: torna alla schermata della sessione.
+    /// Card della sessione ridotta: torna alla schermata della sessione. Ha il colore del dock in quel
+    /// momento (riscaldamento arancio, cambio esercizio grafite, set in corso foglio, recupero blu) con
+    /// l'etichetta della fase, la durata della sessione in alto a destra e i set dell'esercizio di adesso
+    /// (fatti con il valore, da fare con l'obiettivo). Richiesta dell'utente del 24/11.
     private func cardInCorso(_ viva: SessioneInCorso) -> some View {
         let esercizi = avanzamento(viva.sessione)
         let conto = viva.setDiLavoroTotali
-        return VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(viva.sessione.titolo)
-                    .font(.piastra(48))
-                    .foregroundStyle(Color.inchiostro)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-                Text(ResumeText.inProgress(done: conto.fatti, total: conto.totale))
-                    .font(.subheadline)
-                    .foregroundStyle(Color.inchiostroTenue)
+        let fase = FaseCard(viva)
+        return TimelineView(.periodic(from: .now, by: 1)) { contesto in
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(fase.etichetta)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(fase.tenue)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text(SessionText.clock(contesto.date.timeIntervalSince(viva.sessione.startedAt)))
+                            .font(.piastra(28))
+                            .monospacedDigit()
+                            .foregroundStyle(fase.testo)
+                            .accessibilityLabel("Durata della sessione")
+                    }
+                    Text(viva.sessione.titolo)
+                        .font(.piastra(48))
+                        .foregroundStyle(fase.testo)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                    Text(ResumeText.inProgress(done: conto.fatti, total: conto.totale))
+                        .font(.subheadline)
+                        .foregroundStyle(fase.tenue)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    if let indice = viva.indiceEsercizio, !viva.daScegliere {
+                        setDiAdesso(viva, esercizio: indice, fase: fase)
+                    }
+                    Text(ResumeText.summary(esercizi))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(fase.tenue)
+                }
+                PulsanteGiallo(titolo: "Torna alla sessione", azione: apriSessione)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                barrette(esercizi)
-                Text(ResumeText.summary(esercizi))
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.inchiostroTenue)
-            }
-            PulsanteGiallo(titolo: "Torna alla sessione", azione: apriSessione)
+            .padding(.top, 20)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(fase.sfondo, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
-        .padding(.top, 20)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
+    /// Set dell'esercizio di adesso: fatti = fondo pieno con peso × ripetizioni fatti; da fare = solo bordo
+    /// con l'obiettivo; quello di adesso con il bordo pieno.
+    private func setDiAdesso(_ viva: SessioneInCorso, esercizio indice: Int, fase: FaseCard) -> some View {
+        let sets = viva.set[indice]
+        let numeri = SessionText.numbers(sets.map(\.kind))
+        let adesso = viva.indiceEsercizio == indice && viva.setCorrente != nil ? viva.macchina.setIndex : nil
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(viva.esercizi[indice].name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(fase.testo)
+                .lineLimit(1)
+            FilaACapo(spazio: 4) {
+                ForEach(Array(sets.enumerated()), id: \.offset) { posizione, set in
+                    let fatto = set.isDone && set.weight != nil && set.reps != nil
+                    let valore = fatto
+                        ? SessionText.weightReps(set.weight ?? 0, set.reps ?? 0)
+                        : SessionText.weightReps(set.targetWeight, set.targetReps)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(SessionText.shortName(set.kind, numeri[posizione]))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(fase.tenue)
+                        Text(valore)
+                            .font(.piastra(20))
+                            .monospacedDigit()
+                            .foregroundStyle(fatto ? fase.testo : fase.tenue)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background {
+                        if fatto {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(fase.testo.opacity(0.14))
+                        } else {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(fase.testo.opacity(posizione == adesso ? 0.9 : 0.25),
+                                              lineWidth: posizione == adesso ? 2 : 1.5)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityValue(fatto ? "fatto" : "obiettivo")
+                }
+            }
+        }
     }
 
     private func cardDaFare(_ scheda: Routine) -> some View {
@@ -398,4 +462,37 @@ struct HomeView: View {
     }
     .environment(Backup())
     .modelContainer(for: Routine.self, inMemory: true)
+}
+
+/// Colori ed etichetta della card «Sessione in corso»: gli stessi del dock nella fase di adesso.
+private struct FaseCard {
+    let etichetta: String
+    let sfondo: Color
+    let testo: Color
+    let tenue: Color
+
+    @MainActor
+    init(_ viva: SessioneInCorso) {
+        let numero = viva.numeroSetCorrente
+        let tipo = viva.setCorrente?.kind ?? .work
+        let valori: (String, Color, Color, Color)
+        switch viva.fase {
+        case .warmUp:
+            valori = ("Riscaldamento in corso", .riscaldamento, .white, .riscaldamentoTenue)
+        case .changeover:
+            valori = ("Cambio esercizio", .piastra, .white, .piastraTenue)
+        case let .countdown(_, _, pausa):
+            valori = (pausa == .rest ? "Recupero finito" : "Cambio esercizio", .piastra, .white, .piastraTenue)
+        case .inSet:
+            valori = (SessionText.inProgress(tipo, numero), .foglio, .inchiostro, .inchiostroTenue)
+        case .rest:
+            valori = ("Recupero", .recupero, .white, .recuperoTenue)
+        case .finished:
+            valori = ("Tutti i set fatti", .piastra, .white, .piastraTenue)
+        }
+        etichetta = valori.0
+        sfondo = valori.1
+        testo = valori.2
+        tenue = valori.3
+    }
 }

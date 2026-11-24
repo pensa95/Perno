@@ -37,6 +37,8 @@ targets:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        UIBackgroundModes:
+          - audio
         CFBundleURLTypes:
           - CFBundleURLName: com.pensa95.perno
             CFBundleURLSchemes:
