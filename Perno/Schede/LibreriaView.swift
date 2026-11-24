@@ -65,8 +65,10 @@ struct LibreriaView: View {
                                         }
                                         .buttonStyle(.plain)
                                     } else {
-                                        // Il tocco aprirà il dettaglio esercizio (settimane 5–6).
-                                        VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                        NavigationLink(value: RottaStorico.esercizio(esercizio.id, indietro: "Libreria")) {
+                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                        }
+                                        .buttonStyle(.plain)
                                     }
                                 }
                             }

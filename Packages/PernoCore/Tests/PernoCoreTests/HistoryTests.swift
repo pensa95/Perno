@@ -163,3 +163,44 @@ final class ExerciseHistoryTests: XCTestCase {
         XCTAssertEqual(ExerciseHistory.shortDate(date(10, 29), today: date(11, 24), calendar: calendar), "gio 29 ott")
     }
 }
+
+final class ExerciseDetailTests: XCTestCase {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func date(_ month: Int, _ day: Int) -> Date {
+        var parts = DateComponents()
+        parts.year = 2026
+        parts.month = month
+        parts.day = day
+        parts.hour = 18
+        return calendar.date(from: parts)!
+    }
+
+    func testPointsRangeAndRecords() {
+        let exercise = ExerciseHistory.Exercise(id: 1, name: "Chest press", entries: [
+            .init(date: date(4, 2), lifts: [.init(weight: 45, reps: 10)]),
+            .init(date: date(11, 12), lifts: [.init(weight: 65, reps: 8), .init(weight: 62.5, reps: 8)]),
+            .init(date: date(11, 19), lifts: [.init(weight: 62.5, reps: 9)]),
+        ])
+        let all = ExerciseDetail.points(exercise)
+        XCTAssertEqual(all.count, 3)
+        XCTAssertEqual(all[1].estimatedMax, 65 * (1 + 8.0 / 30), accuracy: 0.001)
+        let six = ExerciseDetail.points(all, in: .sixMonths, today: date(11, 24), calendar: calendar)
+        XCTAssertEqual(six.count, 2)
+        XCTAssertEqual(ExerciseDetail.points(all, in: .all, today: date(11, 24), calendar: calendar).count, 3)
+        XCTAssertNil(ExerciseDetail.change([all[0]], range: .all))
+        XCTAssertEqual(ExerciseDetail.recordDates(exercise), [date(11, 12)])
+        XCTAssertEqual(ExerciseDetail.sessionCount(exercise), 3)
+    }
+
+    func testTexts() {
+        XCTAssertEqual(ExerciseDetail.Range.allCases.map(\.label), ["3 mesi", "6 mesi", "1 anno", "Tutto"])
+        XCTAssertEqual(ExerciseDetail.overline(routine: "Upper body", equipment: .machine), "Upper body · macchina")
+        XCTAssertEqual(ExerciseDetail.overline(routine: nil, equipment: .machine), "macchina")
+        XCTAssertEqual(ExerciseDetail.rowDate(date(11, 19), calendar: calendar), "gio 19 nov")
+    }
+}

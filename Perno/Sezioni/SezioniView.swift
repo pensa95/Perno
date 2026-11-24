@@ -40,7 +40,7 @@ struct SezioniView: View {
     @State private var creaPrimaScheda = false
     @State private var sezione: Sezione = .allenati
     /// Percorso dello Storico: «Vedi nello storico» apre il dettaglio della sessione.
-    @State private var percorsoStorico: [UUID] = []
+    @State private var percorsoStorico: [RottaStorico] = []
     @State private var sessione: SessioneInCorso?
     @State private var schermoSessione = false
     /// Riepiloghi già chiusi in questa apertura (prima di eliminare la sessione, così nessuna vista
@@ -84,7 +84,7 @@ struct SezioniView: View {
             NavigationStack {
                 HomeView(sessioneViva: sessione,
                          apriStorico: { registro in
-                             percorsoStorico = [registro.id]
+                             percorsoStorico = [.sessione(registro.id, indietro: Sezione.storico.titolo)]
                              sezione = .storico
                          },
                          avvia: avvia,
@@ -95,7 +95,7 @@ struct SezioniView: View {
             }
             .tabItem { Label(Sezione.allenati.titolo, systemImage: Sezione.allenati.icona) }
             .tag(Sezione.allenati)
-            NavigationStack { SchedeView(creaSubito: $creaPrimaScheda) }
+            NavigationStack { SchedeView(creaSubito: $creaPrimaScheda).destinazioniStorico() }
                 .safeAreaInset(edge: .bottom) { barraRidotta }
                 .tabItem { Label(Sezione.schede.titolo, systemImage: Sezione.schede.icona) }
                 .tag(Sezione.schede)
