@@ -39,6 +39,8 @@ struct SezioniView: View {
     /// Riepiloghi già chiusi in questa apertura (prima di eliminare la sessione, così nessuna vista
     /// legge una sessione già eliminata).
     @State private var riepiloghiChiusi: Set<UUID> = []
+    /// Sessione interrotta aperta con «Chiudi e vai al riepilogo».
+    @State private var riepilogoInterrotta: WorkoutSession?
 
     var body: some View {
         TabView(selection: $sezione) {
@@ -48,7 +50,8 @@ struct SezioniView: View {
                          avvia: avvia,
                          avviaLibera: avviaLibera,
                          riprendi: riprendi,
-                         apriSessione: { schermoSessione = true })
+                         apriSessione: { schermoSessione = true },
+                         apriRiepilogo: { riepilogoInterrotta = $0 })
             }
             .tabItem { Label(Sezione.allenati.titolo, systemImage: Sezione.allenati.icona) }
             .tag(Sezione.allenati)
@@ -64,19 +67,9 @@ struct SezioniView: View {
         .tint(Color.inchiostro)
         .background {
             Color.clear
-                .fullScreenCover(item: Binding(get: { daRivedere }, set: { _ in })) { registro in
-                    RiepilogoChiusaView(sessione: registro,
-                                        salva: {
-                                            registro.isSaved = true
-                                            try? context.save()
-                                        },
-                                        elimina: {
-                                            riepiloghiChiusi.insert(registro.id)
-                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                                context.delete(registro)
-                                                try? context.save()
-                                            }
-                                        })
+                .fullScreenCover(item: Binding(get: { riepilogoDaMostrare },
+                                               set: { if $0 == nil { riepilogoInterrotta = nil } })) { registro in
+                    riepilogo(registro)
                 }
         }
         .onAppear(perform: chiudiInattive)
@@ -90,8 +83,68 @@ struct SezioniView: View {
                              chiudi: {
                                  schermoSessione = false
                                  self.sessione = nil
+                             },
+                             elimina: {
+                                 let registro = sessione.sessione
+                                 schermoSessione = false
+                                 self.sessione = nil
+                                 eliminaDopo(registro)
                              })
             }
+        }
+    }
+
+    /// Riepilogo da mostrare senza schermata della sessione: la sessione interrotta chiusa con
+    /// «Chiudi e vai al riepilogo», oppure quella chiusa da sola.
+    private var riepilogoDaMostrare: WorkoutSession? {
+        if let riepilogoInterrotta, !riepiloghiChiusi.contains(riepilogoInterrotta.id) {
+            return riepilogoInterrotta
+        }
+        return daRivedere
+    }
+
+    /// Riepilogo di una sessione interrotta (con «Continua» e «Completa», che la riprendono) o
+    /// chiusa da sola (senza).
+    @ViewBuilder
+    private func riepilogo(_ registro: WorkoutSession) -> some View {
+        let interrotta = registro.endedAt == nil
+        let continua: (() -> Void)? = interrotta ? { riprendiDalRiepilogo(registro, completando: nil) } : nil
+        let completa: ((SessionExercise) -> Void)? = interrotta
+            ? { esercizio in riprendiDalRiepilogo(registro, completando: esercizio) } : nil
+        RiepilogoView(sessione: registro,
+                      fine: registro.fineRegistrata,
+                      continua: continua,
+                      completa: completa,
+                      salva: {
+                          registro.endedAt = registro.fineRegistrata
+                          registro.isSaved = true
+                          try? context.save()
+                          riepilogoInterrotta = nil
+                      },
+                      elimina: {
+                          riepiloghiChiusi.insert(registro.id)
+                          riepilogoInterrotta = nil
+                          eliminaDopo(registro)
+                      })
+    }
+
+    /// «Continua» o «Completa» nel riepilogo di una sessione interrotta: la sessione riprende
+    /// (come con «Riprendi sessione») e, con «Completa», l'esercizio scelto diventa quello di adesso.
+    private func riprendiDalRiepilogo(_ registro: WorkoutSession, completando esercizio: SessionExercise?) {
+        riepilogoInterrotta = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            riprendi(registro)
+            if let esercizio, let viva = sessione {
+                viva.completa(esercizio)
+            }
+        }
+    }
+
+    /// Elimina dopo la chiusura della vista che la mostra (così nessuna vista legge una sessione eliminata).
+    private func eliminaDopo(_ registro: WorkoutSession) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            context.delete(registro)
+            try? context.save()
         }
     }
 

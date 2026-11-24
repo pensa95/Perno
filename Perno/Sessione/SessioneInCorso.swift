@@ -100,9 +100,10 @@ final class SessioneInCorso: Identifiable {
 
     var fase: SessionPhase { macchina.phase }
 
-    /// Esercizio sullo schermo: quello corrente; a sessione finita, quello dell'ultimo avviso.
+    /// Esercizio sullo schermo: quello corrente; a sessione finita, quello dell'ultimo avviso o
+    /// dell'ultimo set fatto («Continua» dal riepilogo dopo l'ultimo set).
     var indiceEsercizio: Int? {
-        macchina.currentExerciseIndex ?? avviso?.esercizio
+        macchina.currentExerciseIndex ?? avviso?.esercizio ?? macchina.completedSets.last?.exerciseIndex
     }
 
     var esercizioCorrente: SessionExercise? {
@@ -288,11 +289,12 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
-    /// Fine dei 5 s senza tocchi.
+    /// Fine dei 5 s senza tocchi. Dopo l'ultimo set della sessione si apre il riepilogo, con la
+    /// durata che finisce all'ultimo set.
     func chiudiAvviso() {
         avviso = nil
         if macchina.phase == .finished {
-            concludi()
+            apriRiepilogo(alle: macchina.completedSets.map(\.endedAt).max() ?? .now)
         }
     }
 
@@ -416,8 +418,6 @@ final class SessioneInCorso: Identifiable {
         riordina(scaletta.bringingForward(indice), alle: ora)
     }
 
-    /// «Concludi», o fine dell'ultimo set (quando si chiude il suo avviso). Il riepilogo arriva nella settimana 4: per ora la
-    /// sessione si chiude e va nello storico così com'è.
     /// Set di lavoro fatti e previsti in tutta la sessione.
     var setDiLavoroTotali: (fatti: Int, totale: Int) {
         esercizi.indices.reduce((0, 0)) { somma, indice in
@@ -426,11 +426,52 @@ final class SessioneInCorso: Identifiable {
         }
     }
 
-    func concludi(alle ora: Date = .now) {
+    // MARK: Riepilogo
+
+    /// Riepilogo aperto sopra la sessione («Concludi» o fine dell'ultimo set).
+    private(set) var riepilogoAperto = false
+    /// Fine della sessione mostrata nel riepilogo (ferma finché il riepilogo è aperto).
+    private(set) var fineRiepilogo: Date = .now
+
+    /// «Concludi», o fine dell'ultimo set: il riepilogo si apre, la sessione non è ancora chiusa.
+    func apriRiepilogo(alle ora: Date = .now) {
+        avviso = nil
+        fineRiepilogo = ora
+        riepilogoAperto = true
+    }
+
+    /// «Continua»: si torna alla sessione da dove era.
+    func continua() {
+        riepilogoAperto = false
+    }
+
+    /// «Completa» su un esercizio con set non fatti: diventa quello di adesso, dal primo set non
+    /// fatto, con il cambio esercizio da adesso.
+    func completa(_ esercizio: SessionExercise, alle ora: Date = .now) {
+        guard let indice = esercizi.firstIndex(where: { $0 === esercizio }) else { return }
+        do {
+            try macchina.complete(exercise: indice, at: ora)
+        } catch {
+            return
+        }
+        esercizi[indice].isPostponed = false
+        rimandatiAlle[indice] = nil
+        for (posizione, voce) in macchina.order.enumerated() {
+            esercizi[voce].position = posizione
+        }
+        riepilogoAperto = false
+        sessione.lastActivityAt = ora
+        aggiornaRecuperoAbituale()
+        try? context.save()
+    }
+
+    /// «Salva sessione»: la sessione si chiude alla fine del riepilogo e va nello storico.
+    func salva(alle ora: Date = .now) {
         macchina.finish()
         avviso = nil
+        riepilogoAperto = false
         conclusa = true
-        sessione.endedAt = sessione.endedAt ?? ora
+        sessione.endedAt = sessione.endedAt ?? fineRiepilogo
         sessione.isSaved = true
         sessione.lastActivityAt = ora
         try? context.save()

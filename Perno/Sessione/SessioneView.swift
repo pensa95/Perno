@@ -9,10 +9,11 @@ struct SessioneView: View {
     let sessione: SessioneInCorso
     /// Freccia giù: la schermata si chiude, la sessione continua (barra ridotta e card in Home).
     let riduci: () -> Void
-    /// Sessione chiusa.
+    /// Sessione chiusa («Salva sessione» nel riepilogo).
     let chiudi: () -> Void
+    /// «Elimina sessione» nel riepilogo.
+    let elimina: () -> Void
 
-    @State private var chiediConclusione = false
     @State private var correzione: Correzione?
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
@@ -27,6 +28,29 @@ struct SessioneView: View {
     }
 
     var body: some View {
+        ZStack {
+            if sessione.riepilogoAperto {
+                RiepilogoView(sessione: sessione.sessione,
+                              fine: sessione.fineRiepilogo,
+                              continua: { sessione.continua() },
+                              completa: { esercizio in sessione.completa(esercizio) },
+                              salva: { sessione.salva() },
+                              elimina: elimina)
+                    .transition(.move(edge: .trailing))
+            } else {
+                schermata
+                    .transition(.move(edge: .leading))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: sessione.riepilogoAperto)
+        .onChange(of: sessione.conclusa) { _, conclusa in
+            if conclusa { chiudi() }
+        }
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+    }
+
+    private var schermata: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
             let ora = contesto.date
             ZStack {
@@ -80,11 +104,6 @@ struct SessioneView: View {
             guard !Task.isCancelled, sessione.avviso?.scadenza == scadenza else { return }
             sessione.chiudiAvviso()
         }
-        .onChange(of: sessione.conclusa) { _, conclusa in
-            if conclusa { chiudi() }
-        }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .sheet(isPresented: $aggiungiAperto) {
             AggiungiEserciziView(sessione: sessione)
         }
@@ -93,10 +112,6 @@ struct SessioneView: View {
         }
         .sheet(item: $correzione) { correzione in
             CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
-        }
-        .confirmationDialog("Concludere la sessione?", isPresented: $chiediConclusione, titleVisibility: .visible) {
-            Button("Concludi sessione") { sessione.concludi() }
-            Button("Continua", role: .cancel) {}
         }
     }
 
@@ -124,7 +139,7 @@ struct SessioneView: View {
             PulsanteTondo(icona: "list.bullet", etichetta: "Scaletta") {
                 scalettaAperta = true
             }
-            Button("Concludi") { chiediConclusione = true }
+            Button("Concludi") { sessione.apriRiepilogo() }
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.inchiostro)
                 .frame(width: 76, height: 44, alignment: .trailing)

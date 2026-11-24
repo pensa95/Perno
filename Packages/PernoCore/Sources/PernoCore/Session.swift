@@ -185,13 +185,13 @@ public struct SessionMachine: Sendable {
             startedAt: since,
             endedAt: now
         ))
-        setIndex += 1
-        if setIndex < exercises[exerciseIndex].sets.count {
+        // Il prossimo set non ancora fatto (dopo «Elimina set» o «Completa» ci possono essere set
+        // già fatti più avanti); finiti i set, il prossimo esercizio con set da fare.
+        if let next = firstUndoneSet(of: exerciseIndex, after: setIndex) {
+            setIndex = next
             phase = .rest(since: now)
         } else {
-            position += 1
-            setIndex = 0
-            phase = position < order.count || isOpenEnded ? .changeover(since: now) : .finished
+            moveToNextExercise(at: now)
         }
     }
 
@@ -276,7 +276,8 @@ extension SessionMachine {
         case .rest:
             previousPosition = position
         case .changeover, .finished:
-            previousPosition = position - 1
+            // Dopo l'ultimo set si salta agli esercizi con set da fare: si torna a quello del set.
+            previousPosition = order[..<min(position, order.count)].lastIndex(of: last.exerciseIndex) ?? -1
         default:
             throw SessionError.invalidTransition
         }
