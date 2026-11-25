@@ -125,9 +125,15 @@ extension WorkoutSession {
     /// Nello storico: chiusa, esclusa quella chiusa da sola e non ancora salvata.
     var nelloStorico: Bool { endedAt != nil && !(closedAutomatically && !isSaved) }
 
-    /// Set di lavoro fatti di un esercizio, come alzate (pesi in chili).
+    /// Set di lavoro fatti di un esercizio, come alzate (pesi in chili). Per un esercizio a tempo
+    /// (UI v5) le ripetizioni dell'alzata sono i secondi fatti (vedi `ExerciseHistory.Exercise.timed`).
     static func alzate(_ voce: SessionExercise) -> [SessionSummary.Lift] {
-        voce.orderedSets.compactMap { set in
+        if voce.isTimed {
+            return voce.orderedSets.compactMap(\.setATempoFatto).map {
+                SessionSummary.Lift(weight: voce.withWeight ? $0.weight : 0, reps: $0.seconds)
+            }
+        }
+        return voce.orderedSets.compactMap { set in
             guard set.isDone, set.kind != .approach, !set.aTempo,
                   let peso = set.weight, let ripetizioni = set.reps else { return nil }
             return SessionSummary.Lift(weight: peso, reps: ripetizioni)
@@ -137,13 +143,23 @@ extension WorkoutSession {
 
 extension Exercise {
     /// Volte nello storico, dalla più recente: sessione e set di lavoro fatti.
+    /// Se l'esercizio è stato usato sia a ripetizioni sia a tempo, valgono le volte fatte come l'ultima.
     var volteNelloStorico: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])] {
-        sessionExercises.compactMap { voce -> (sessione: WorkoutSession, alzate: [SessionSummary.Lift])? in
-            guard let sessione = voce.session, sessione.nelloStorico else { return nil }
+        let aTempo = ultimaVoltaATempo
+        return sessionExercises.compactMap { voce -> (sessione: WorkoutSession, alzate: [SessionSummary.Lift])? in
+            guard voce.isTimed == aTempo, let sessione = voce.session, sessione.nelloStorico else { return nil }
             let alzate = WorkoutSession.alzate(voce)
             return alzate.isEmpty ? nil : (sessione, alzate)
         }
         .sorted { $0.sessione.startedAt > $1.sessione.startedAt }
+    }
+
+    /// L'ultima volta nello storico (con set fatti) era a tempo (UI v5).
+    var ultimaVoltaATempo: Bool {
+        sessionExercises
+            .filter { voce in voce.session?.nelloStorico == true && voce.sets.contains { $0.isDone } }
+            .max { ($0.session?.startedAt ?? .distantPast) < ($1.session?.startedAt ?? .distantPast) }?
+            .isTimed ?? false
     }
 
     /// L'esercizio come lo vede lo Storico (record, ultima volta, grafico).
@@ -153,7 +169,7 @@ extension Exercise {
     func storico(da volte: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])]) -> ExerciseHistory.Exercise<UUID> {
         ExerciseHistory.Exercise(id: id, name: name, entries: volte.map {
             ExerciseHistory.Entry(date: $0.sessione.startedAt, lifts: $0.alzate)
-        })
+        }, timed: ultimaVoltaATempo)
     }
 
     /// Recupero abituale dai recuperi registrati (esclusi avvicinamenti e cambi).

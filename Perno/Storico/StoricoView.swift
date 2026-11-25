@@ -51,16 +51,24 @@ struct StoricoView: View {
     /// Esercizi fatti nelle sessioni dello storico, con i set di lavoro di ogni volta.
     private func eserciziStorico(_ chiuse: [WorkoutSession]) -> [ExerciseHistory.Exercise<UUID>] {
         var volte: [UUID: (nome: String, voci: [ExerciseHistory.Entry])] = [:]
+        // A tempo o a ripetizioni come l'ultima volta (UI v5), calcolato una volta per esercizio.
+        var aTempo: [UUID: Bool] = [:]
         for sessione in chiuse {
             for voce in sessione.exercises {
                 guard let esercizio = voce.exercise else { continue }
+                let modo = aTempo[esercizio.id] ?? esercizio.ultimaVoltaATempo
+                aTempo[esercizio.id] = modo
+                guard voce.isTimed == modo else { continue }
                 let alzate = WorkoutSession.alzate(voce)
                 guard !alzate.isEmpty else { continue }
                 volte[esercizio.id, default: (esercizio.name, [])].voci
                     .append(ExerciseHistory.Entry(date: sessione.startedAt, lifts: alzate))
             }
         }
-        return volte.map { ExerciseHistory.Exercise(id: $0.key, name: $0.value.nome, entries: $0.value.voci) }
+        return volte.map {
+            ExerciseHistory.Exercise(id: $0.key, name: $0.value.nome, entries: $0.value.voci,
+                                     timed: aTempo[$0.key] ?? false)
+        }
     }
 
     private func gruppiEsercizi(_ esercizi: [ExerciseHistory.Exercise<UUID>]) -> [ExerciseHistory.Group<UUID>] {
@@ -206,14 +214,14 @@ struct StoricoView: View {
                     }
                 }
                 if let ultima = esercizio.last {
-                    sottotitolo(ExerciseHistory.lastText(ultima.lift, date: ultima.date, today: oggi, calendar: calendario),
+                    sottotitolo(ExerciseHistory.lastText(esercizio.text(ultima.lift), date: ultima.date, today: oggi, calendar: calendario),
                                 fermo: fermo)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if let record = esercizio.record {
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(SessionText.weightReps(record.lift.weight, record.lift.reps))
+                    Text(esercizio.text(record.lift))
                         .font(.piastra(28))
                         .monospacedDigit()
                         .foregroundStyle(Color.inchiostro)
