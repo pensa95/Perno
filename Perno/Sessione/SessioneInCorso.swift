@@ -14,6 +14,8 @@ final class SessioneInCorso: Identifiable {
     private(set) var set: [[SessionSet]]
     /// Set di lavoro dell'ultima volta, per «prima 60 × 12».
     private(set) var prima: [[(weight: Double, reps: Int)]]
+    /// Set a tempo dell'ultima volta, per «prima 10 × 0:40» e «+5 s» (UI v5).
+    private(set) var primaATempo: [[TimedSet]]
     /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, «Prima di ogni set»).
     let secondiContoAllaRovescia = Impostazioni.secondiContoAllaRovescia
 
@@ -59,6 +61,9 @@ final class SessioneInCorso: Identifiable {
         let set = esercizi.map(\.orderedSets)
         self.set = set
         self.prima = esercizi.map { $0.exercise.map(WorkoutSession.ultimiSetDiLavoro) ?? [] }
+        self.primaATempo = esercizi.map { voce in
+            voce.isTimed ? (voce.exercise.map(WorkoutSession.ultimiSetATempo) ?? []) : []
+        }
         let piano = zip(esercizi, set).map { esercizio, sets in
             PlannedExercise(name: esercizio.name, sets: sets.map {
                 PlannedSet(kind: $0.kind, weight: $0.targetWeight, reps: $0.targetReps)
@@ -407,6 +412,7 @@ final class SessioneInCorso: Identifiable {
             esercizi.append(registrato)
             set.append(sets)
             prima.append(precedenti)
+            primaATempo.append([])
             piani.append(PlannedExercise(name: esercizio.name, sets: piano))
         }
         macchina.appendExercises(piani, at: ora)

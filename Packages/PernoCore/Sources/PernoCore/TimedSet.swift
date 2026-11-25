@@ -87,3 +87,61 @@ public enum TimedText {
         return DurationLimits.clamp(seconds)
     }
 }
+
+// MARK: - Progressione e confronto con la volta prima
+
+/// Un set a tempo fatto: obiettivo e durata fatta, in secondi, con il peso (in chili).
+public struct TimedSet: Equatable, Sendable {
+    public var target: Int
+    public var seconds: Int
+    public var weight: Double
+
+    public init(target: Int, seconds: Int, weight: Double = 0) {
+        self.target = target
+        self.seconds = seconds
+        self.weight = weight
+    }
+}
+
+public enum TimedProgression {
+    /// Durata obiettivo di oggi. Se l'ultima volta ha tenuto l'obiettivo in tutti i set, +5 s;
+    /// altrimenti lo stesso obiettivo dell'ultima volta. Mai sotto la durata della scheda.
+    public static func target(base: Int, last: [TimedSet]) -> Int {
+        guard let lastTarget = last.map(\.target).max() else { return DurationLimits.clamp(base) }
+        let held = last.allSatisfy { $0.seconds >= $0.target }
+        let next = held ? lastTarget + DurationLimits.progressionStep : lastTarget
+        return DurationLimits.clamp(max(base, next))
+    }
+}
+
+extension TimedText {
+    /// Sulla piastra di adesso: «+5 s» rispetto alla durata fatta la volta prima; `nil` se uguale.
+    public static func delta(today: Int, before: Int) -> String? {
+        let difference = today - before
+        guard difference != 0 else { return nil }
+        return (difference > 0 ? "+" : "−") + "\(abs(difference)) s"
+    }
+
+    /// «prima 10 × 0:40» (o «prima 0:40» senza peso).
+    public static func before(seconds: Int, weight: Double?) -> String {
+        "prima " + value(seconds: seconds, weight: weight)
+    }
+}
+
+extension SessionSummary {
+    /// Record a tempo: la durata più lunga di oggi supera tutte quelle delle volte prima.
+    /// Serve almeno una volta prima, come per i record a ripetizioni.
+    public static func timedRecord(exercise: String, today: [TimedSet], previous: [TimedSet],
+                                   withWeight: Bool) -> Record? {
+        guard let best = today.filter({ $0.seconds > 0 }).max(by: { $0.seconds < $1.seconds }),
+              let previousBest = previous.map(\.seconds).max(),
+              best.seconds > previousBest else { return nil }
+        return Record(exercise: exercise, lift: Lift(weight: best.weight, reps: 0),
+                      seconds: best.seconds, withWeight: withWeight)
+    }
+
+    /// Chili dei set fatti: i set a tempo non contano (non hanno ripetizioni).
+    public static func liftedKilogramsExcludingTimed(_ sets: [(kind: SetKind, weight: Double, reps: Int, timed: Bool)]) -> Double {
+        HomeText.liftedKilograms(sets.filter { !$0.timed }.map { ($0.kind, $0.weight, $0.reps) })
+    }
+}

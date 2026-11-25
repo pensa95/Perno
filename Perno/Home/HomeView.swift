@@ -309,9 +309,7 @@ struct HomeView: View {
             FilaACapo(spazio: 4) {
                 ForEach(Array(sets.enumerated()), id: \.offset) { posizione, set in
                     let fatto = set.isDone && set.weight != nil && set.reps != nil
-                    let valore = fatto
-                        ? SessionText.weightReps(set.weight ?? 0, set.reps ?? 0)
-                        : SessionText.weightReps(set.targetWeight, set.targetReps)
+                    let valore = set.testoValore
                     VStack(alignment: .leading, spacing: 0) {
                         Text(SessionText.shortName(set.kind, numeri[posizione]))
                             .font(.caption2.weight(.semibold))

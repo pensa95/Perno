@@ -192,9 +192,7 @@ struct DettaglioSessioneView: View {
     /// Set fatto: fondo chiaro pieno, «62,5 × 9» e «riserva 1». Non fatto: solo bordo, numeri tenui e «non fatto».
     private func piastrina(_ set: SessionSet) -> some View {
         let fatto = set.isDone
-        let testo = fatto
-            ? SessionText.weightReps(set.weight ?? set.targetWeight, set.reps ?? set.targetReps)
-            : SessionText.weightReps(set.targetWeight, set.targetReps)
+        let testo = set.testoValore
         let sotto = fatto ? SessionDetailText.reserve(set.reserve) : SessionDetailText.notDone
         return VStack(alignment: .leading, spacing: 0) {
             Text(testo)

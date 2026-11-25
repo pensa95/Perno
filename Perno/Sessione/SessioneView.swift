@@ -353,7 +353,8 @@ struct SessioneView: View {
                          ? TimedText.exerciseHeader(position: sessione.numeroEsercizio,
                                                     count: sessione.esercizi.count,
                                                     sets: sessione.setDiLavoro(di: indice).totale,
-                                                    seconds: esercizio.targetSeconds)
+                                                    seconds: sessione.set[indice].first
+                                                        .map(sessione.obiettivoSecondi) ?? esercizio.targetSeconds)
                          : SessionText.exerciseHeader(position: sessione.numeroEsercizio,
                                                       count: sessione.esercizi.count,
                                                       repsMin: esercizio.repsMin, repsMax: esercizio.repsMax))
@@ -545,8 +546,12 @@ struct SessioneView: View {
             if case .inSet = sessione.fase { return true }
             return false
         }()
+        // «+5 s» e «prima 10 × 0:40» rispetto allo stesso set della volta prima.
+        let prima = set.kind == .approach ? nil : sessione.primaATempo[indice][safe: numeri[posizione] - 1]
         return PiastraSet(nome: nome, valore: valore, stato: .adesso(
-            etichetta: inCorso ? "\(nome), in corso" : "\(nome), obiettivo", evidenza: nil, nota: nil))
+            etichetta: inCorso ? "\(nome), in corso" : "\(nome), obiettivo",
+            evidenza: prima.flatMap { TimedText.delta(today: obiettivo, before: $0.seconds) },
+            nota: prima.map { TimedText.before(seconds: $0.seconds, weight: sessione.pesoATempo(indice, $0.weight)) }))
     }
 
     // MARK: Dock
