@@ -16,6 +16,8 @@ App iOS nativa (Swift/SwiftUI) per registrare gli allenamenti in palestra. Offli
 Nel progetto claude.ai «App palestra» (documenti `claude/…`):
 - `funzionalita-v1.md` — cosa fa l'app (fonte per il codice).
 - `schermate-ui-v4.md` — tavole della UI v4, **fonte di verità**: canvas https://claude.ai/artifact/Rya7xFNT3KLuxohPYqGBUV e canvas della Live Activity https://claude.ai/artifact/WkBgjgJLNDqgeCn7muwaDd (regole in `live-activity-v1.md`). La UI v3 è superata.
+- `schermate-ui-v5.md` — **esercizi a tempo**, si aggiunge alla v4 (fonte di verità per tutto ciò che riguarda il tempo): canvas https://claude.ai/artifact/7Wo7CJi5yRyvcK6UVtjvQp.
+- `note-fix.md` — elenco delle fix chieste dall'utente, con lo stato.
 - `piano-sviluppo.md` — calendario a settimane e regole per il piano Pro.
 - `identity-v1.md` — nome Perno, marchio, icona.
 
@@ -31,6 +33,9 @@ Nel progetto claude.ai «App palestra» (documenti `claude/…`):
 | Cambio esercizio | `changeover` | Da «Set fatto» dell'ultimo set a «Inizia» del primo set dell'esercizio successivo; salvato a parte |
 | Durata del set | `setDuration` | Dalla fine del 3-2-1 a «Set fatto» |
 | Recupero abituale | `usualRest` | Media dei recuperi dei set di lavoro (esclusi avvicinamenti e cambi) |
+| Si misura in: Ripetizioni / Tempo | `SetMeasure` (`.reps` / `.time`) | Scelta nell'esercizio della scheda (UI v5) |
+| Durata (del set a tempo) | `targetSeconds` / `seconds` | Durata obiettivo e fatta di un set a tempo, in secondi; passi di 5 s |
+| Con peso | `withWeight` | Spunta degli esercizi a tempo; a ripetizioni il peso c'è sempre |
 
 ## Ciclo della sessione (non cambiarlo)
 
@@ -41,7 +46,7 @@ Riscaldamento (dock arancio) → Cambio esercizio (grafite) → «Inizia» → 3
 - `Packages/PernoCore/` — logica pura in Swift (solo Foundation, deve compilare anche su Linux), con test XCTest. Tutta la logica che si può testare va qui, non nelle view.
 - `Perno/` — app SwiftUI (iOS 17+).
 - `PernoWidget/` — estensione WidgetKit con la Live Activity della sessione (blocco schermo e Dynamic Island). `Shared/` è compilato nell'app e nell'estensione (attributi e pulsanti, `LiveActivityIntent`); i testi della card li prepara `LiveActivityText` in `PernoCore`.
-- `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
+- `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `SchemaV2` attuale, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
 - `project.yml` — progetto XcodeGen; il `.xcodeproj` non si committa, lo genera la CI.
 - `.github/workflows/build.yml` — test su Linux e macOS, build `.ipa` non firmata, release scaricabile dal telefono.
 

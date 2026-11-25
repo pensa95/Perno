@@ -14,6 +14,8 @@ final class SessioneInCorso: Identifiable {
     private(set) var set: [[SessionSet]]
     /// Set di lavoro dell'ultima volta, per «prima 60 × 12».
     private(set) var prima: [[(weight: Double, reps: Int)]]
+    /// Set a tempo dell'ultima volta, per «prima 10 × 0:40» e «+5 s» (UI v5).
+    private(set) var primaATempo: [[TimedSet]]
     /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, «Prima di ogni set»).
     let secondiContoAllaRovescia = Impostazioni.secondiContoAllaRovescia
 
@@ -59,6 +61,9 @@ final class SessioneInCorso: Identifiable {
         let set = esercizi.map(\.orderedSets)
         self.set = set
         self.prima = esercizi.map { $0.exercise.map(WorkoutSession.ultimiSetDiLavoro) ?? [] }
+        self.primaATempo = esercizi.map { voce in
+            voce.isTimed ? (voce.exercise.map(WorkoutSession.ultimiSetATempo) ?? []) : []
+        }
         let piano = zip(esercizi, set).map { esercizio, sets in
             PlannedExercise(name: esercizio.name, sets: sets.map {
                 PlannedSet(kind: $0.kind, weight: $0.targetWeight, reps: $0.targetReps)
@@ -155,9 +160,51 @@ final class SessioneInCorso: Identifiable {
         let fattiPrima = macchina.completedSets.count
         esegui(ora) { try $0.setDone(at: ora) }
         if let fatto = macchina.completedSets.last, macchina.completedSets.count > fattiPrima {
+            if esercizi[fatto.exerciseIndex].isTimed {
+                // A tempo: si salva il tempo fatto, mai oltre l'obiettivo (a zero si chiude da solo).
+                let registrato = set[fatto.exerciseIndex][fatto.setIndex]
+                registrato.seconds = TimedText.secondsDone(duration: fatto.duration,
+                                                           target: obiettivoSecondi(registrato))
+                try? context.save()
+            }
             avviso = Avviso(esercizio: fatto.exerciseIndex, set: fatto.setIndex,
                             scadenza: ora.addingTimeInterval(Self.durataAvviso))
         }
+    }
+
+    // MARK: Set a tempo (UI v5)
+
+    /// L'esercizio si misura a tempo.
+    func aTempo(_ indice: Int) -> Bool {
+        esercizi.indices.contains(indice) && esercizi[indice].isTimed
+    }
+
+    /// Durata obiettivo di un set a tempo, in secondi.
+    func obiettivoSecondi(_ registrato: SessionSet) -> Int {
+        registrato.targetSeconds ?? registrato.sessionExercise?.targetSeconds ?? DurationLimits.standard
+    }
+
+    /// Peso da mostrare per un esercizio a tempo: `nil` senza «Con peso».
+    func pesoATempo(_ indice: Int, _ peso: Double) -> Double? {
+        esercizi[indice].withWeight ? peso : nil
+    }
+
+    /// Dopo «Annulla» su un set a tempo già allo zero non si richiude da solo: si chiude a mano.
+    @ObservationIgnored private var chiusuraSospesaDal: Date? = nil
+
+    /// Zero del set a tempo in corso: lì il set si chiude da solo.
+    var fineSetATempo: Date? {
+        guard case let .inSet(dal) = fase, let indice = macchina.currentExerciseIndex, aTempo(indice),
+              let registrato = setCorrente, chiusuraSospesaDal != dal else { return nil }
+        return dal.addingTimeInterval(TimeInterval(obiettivoSecondi(registrato)))
+    }
+
+    /// −/+ di 5 s sulla durata del set a tempo appena fatto.
+    func cambiaSecondi(di passi: Int, alle ora: Date = .now) {
+        guard let registrato = setDellAvviso else { return }
+        let attuali = registrato.seconds ?? obiettivoSecondi(registrato)
+        registrato.seconds = DurationLimits.stepped(attuali, by: passi)
+        rinnovaAvviso(ora)
     }
 
     // MARK: Recupero
@@ -191,8 +238,16 @@ final class SessioneInCorso: Identifiable {
     /// (anche quello di adesso) cambia l'obiettivo. I set dopo con lo stesso obiettivo prendono il
     /// peso nuovo (e, dal primo set di lavoro, anche gli avvicinamenti da fare).
     func correggi(esercizio: Int, set indice: Int, peso: Double, ripetizioni: Int,
-                  tipo: SetKind, riserva: Reserve?, alle ora: Date = .now) {
+                  tipo: SetKind, riserva: Reserve?, secondi: Int? = nil, alle ora: Date = .now) {
         let registrato = set[esercizio][indice]
+        if let secondi {
+            // A tempo: durata fatta su un set fatto, durata obiettivo su un set da fare.
+            if macchina.isDone(exercise: esercizio, set: indice) {
+                registrato.seconds = secondi
+            } else {
+                registrato.targetSeconds = secondi
+            }
+        }
         let cambiati: [Int]
         do {
             if macchina.isDone(exercise: esercizio, set: indice) {
@@ -235,6 +290,7 @@ final class SessioneInCorso: Identifiable {
         registrato.reserve = nil
         registrato.startedAt = nil
         registrato.endedAt = nil
+        registrato.seconds = nil
         setScritti = macchina.completedSets.count
         if avviso?.esercizio == esercizio && avviso?.set == indice {
             avviso = nil
@@ -282,8 +338,12 @@ final class SessioneInCorso: Identifiable {
         registrato.reserve = nil
         registrato.startedAt = nil
         registrato.endedAt = nil
+        registrato.seconds = nil
         setScritti = macchina.completedSets.count
         avviso = nil
+        if case let .inSet(dal) = fase, let indice = macchina.currentExerciseIndex, aTempo(indice) {
+            chiusuraSospesaDal = dal
+        }
         sessione.lastActivityAt = ora
         aggiornaRecuperoAbituale()
         try? context.save()
@@ -352,6 +412,7 @@ final class SessioneInCorso: Identifiable {
             esercizi.append(registrato)
             set.append(sets)
             prima.append(precedenti)
+            primaATempo.append([])
             piani.append(PlannedExercise(name: esercizio.name, sets: piano))
         }
         macchina.appendExercises(piani, at: ora)
@@ -372,6 +433,9 @@ final class SessioneInCorso: Identifiable {
         let piano = macchina.exercises[indice].sets[nuovo]
         let registrato = SessionSet(position: nuovo, kind: piano.kind,
                                     targetWeight: piano.weight, targetReps: piano.reps)
+        if aTempo(indice) {
+            registrato.targetSeconds = set[indice].last.map(obiettivoSecondi) ?? esercizi[indice].targetSeconds
+        }
         context.insert(registrato)
         registrato.sessionExercise = esercizi[indice]
         set[indice].append(registrato)

@@ -193,26 +193,43 @@ public enum ExerciseHistory {
         public var id: ID
         public var name: String
         public var entries: [Entry]
+        /// Esercizio a tempo (UI v5): in ogni `Lift` le ripetizioni sono i secondi fatti e il peso
+        /// può essere 0 (senza peso). Il record è la durata più lunga, non il massimale stimato.
+        public var timed: Bool
 
-        public init(id: ID, name: String, entries: [Entry]) {
+        public init(id: ID, name: String, entries: [Entry], timed: Bool = false) {
             self.id = id
             self.name = name
             self.entries = entries
+            self.timed = timed
         }
 
-        /// Volte con almeno un set valido (peso e ripetizioni sopra zero), dalla più vecchia.
+        /// Volte con almeno un set valido (peso e ripetizioni sopra zero; a tempo basta la durata),
+        /// dalla più vecchia.
         var valid: [(date: Date, lifts: [SessionSummary.Lift])] {
             entries
-                .map { (date: $0.date, lifts: $0.lifts.filter { $0.weight > 0 && $0.reps > 0 }) }
+                .map { (date: $0.date, lifts: $0.lifts.filter { (timed || $0.weight > 0) && $0.reps > 0 }) }
                 .filter { !$0.lifts.isEmpty }
                 .sorted { $0.date < $1.date }
         }
 
-        /// Record personale: il set con il massimale stimato più alto (a parità, il primo) e la sua data.
+        /// Valore che fa il record: massimale stimato, oppure i secondi per un esercizio a tempo.
+        public func score(_ lift: SessionSummary.Lift) -> Double {
+            timed ? Double(lift.reps) : lift.estimatedMax
+        }
+
+        /// «62,5 × 9»; a tempo «10 × 0:45» o «0:45» senza peso.
+        public func text(_ lift: SessionSummary.Lift) -> String {
+            timed ? TimedText.value(seconds: lift.reps, weight: lift.weight > 0 ? lift.weight : nil)
+                  : SessionText.weightReps(lift.weight, lift.reps)
+        }
+
+        /// Record personale: il set con il massimale stimato più alto (a tempo: la durata più lunga;
+        /// a parità, il primo) e la sua data.
         public var record: (lift: SessionSummary.Lift, date: Date)? {
             var best: (lift: SessionSummary.Lift, date: Date)?
             for entry in valid {
-                for lift in entry.lifts where lift.estimatedMax > (best?.lift.estimatedMax ?? 0) + 0.001 {
+                for lift in entry.lifts where score(lift) > (best.map { score($0.lift) } ?? 0) + 0.001 {
                     best = (lift, entry.date)
                 }
             }
@@ -220,10 +237,13 @@ public enum ExerciseHistory {
         }
 
         /// Ultima volta: il set più pesante (a parità di peso, più ripetizioni) e la data.
+        /// A tempo: il set più lungo (a parità, il più pesante).
         public var last: (lift: SessionSummary.Lift, date: Date)? {
-            guard let entry = valid.last,
-                  let lift = entry.lifts.max(by: { ($0.weight, $0.reps) < ($1.weight, $1.reps) }) else { return nil }
-            return (lift, entry.date)
+            guard let entry = valid.last else { return nil }
+            let lift = timed
+                ? entry.lifts.max(by: { ($0.reps, $0.weight) < ($1.reps, $1.weight) })
+                : entry.lifts.max(by: { ($0.weight, $0.reps) < ($1.weight, $1.reps) })
+            return lift.map { ($0, entry.date) }
         }
 
         /// «nuovo»: record fatto negli ultimi 14 giorni che ha superato una volta precedente
@@ -295,7 +315,12 @@ public enum ExerciseHistory {
 
     /// «Ultima: 62,5 × 9, gio 19»; fuori dal mese di oggi «Ultima: 62,5 × 9, gio 19 ott».
     public static func lastText(_ lift: SessionSummary.Lift, date: Date, today: Date, calendar: Calendar = .current) -> String {
-        "Ultima: \(SessionText.weightReps(lift.weight, lift.reps)), \(shortDate(date, today: today, calendar: calendar))"
+        lastText(SessionText.weightReps(lift.weight, lift.reps), date: date, today: today, calendar: calendar)
+    }
+
+    /// Come sopra, con il valore già scritto (anche a tempo: «Ultima: 10 × 0:45, gio 19»).
+    public static func lastText(_ value: String, date: Date, today: Date, calendar: Calendar = .current) -> String {
+        "Ultima: \(value), \(shortDate(date, today: today, calendar: calendar))"
     }
 
     /// «gio 19», con il mese corto («gio 19 ott») se non è il mese di oggi.
@@ -374,10 +399,10 @@ public enum ExerciseDetail {
         public var estimatedMax: Double
     }
 
-    /// Un punto per volta, dalla più vecchia.
+    /// Un punto per volta, dalla più vecchia. A tempo il valore è la durata più lunga, in secondi.
     public static func points<ID: Hashable>(_ exercise: ExerciseHistory.Exercise<ID>) -> [Point] {
         exercise.valid.compactMap { entry in
-            entry.lifts.map(\.estimatedMax).max().map { Point(date: entry.date, estimatedMax: $0) }
+            entry.lifts.map(exercise.score).max().map { Point(date: entry.date, estimatedMax: $0) }
         }
     }
 
@@ -394,6 +419,20 @@ public enum ExerciseDetail {
         let value = Int(Units.unit.fromKilograms(last.estimatedMax - first.estimatedMax).rounded())
         let sign = value > 0 ? "+" : (value < 0 ? "−" : "")
         return "\(sign)\(abs(value)) \(Units.unit.symbol) \(range.span)"
+    }
+
+    /// A tempo: «+20 s in 6 mesi» (valori in secondi); `nil` con meno di due punti.
+    public static func timedChange(_ points: [Point], range: Range) -> String? {
+        guard points.count >= 2, let first = points.first, let last = points.last else { return nil }
+        let value = Int((last.estimatedMax - first.estimatedMax).rounded())
+        let sign = value > 0 ? "+" : (value < 0 ? "−" : "")
+        return "\(sign)\(abs(value)) s \(range.span)"
+    }
+
+    /// A tempo: «giovedì 12 novembre · durata più lunga».
+    public static func timedRecordDetail(date: Date, calendar: Calendar = .current) -> String {
+        let day = ItalianDate.long(date, calendar: calendar)
+        return day.prefix(1).lowercased() + String(day.dropFirst()) + " · durata più lunga"
     }
 
     /// «giovedì 12 novembre · massimale stimato 82 kg».
@@ -429,7 +468,7 @@ public enum ExerciseDetail {
         var best: Double?
         var dates = Set<Date>()
         for entry in exercise.valid {
-            guard let today = entry.lifts.map(\.estimatedMax).max() else { continue }
+            guard let today = entry.lifts.map(exercise.score).max() else { continue }
             if let previous = best, today > previous + 0.001 { dates.insert(entry.date) }
             best = Swift.max(best ?? 0, today)
         }

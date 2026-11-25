@@ -104,11 +104,16 @@ public struct LiveActivityInput: Sendable {
     public var sessionStart: Date
     public var workSetsDone: Int
     public var workSetsTotal: Int
+    /// Set a tempo (UI v5): durata obiettivo in secondi; `nil` per i set a ripetizioni.
+    public var targetSeconds: Int?
+    /// Esercizio a tempo con «Con peso» (senza, il valore è solo «0:45»).
+    public var withWeight: Bool
 
     public init(phase: SessionPhase, routine: String, exercise: String?, exerciseWorkSets: Int,
                 setKind: SetKind?, setNumber: Int, weight: Double?, reps: Int?, restMode: RestMode,
                 restDuration: TimeInterval, restLabel: String, countdownSeconds: Int, canPostpone: Bool,
-                awaitingChoice: Bool, sessionStart: Date, workSetsDone: Int, workSetsTotal: Int) {
+                awaitingChoice: Bool, sessionStart: Date, workSetsDone: Int, workSetsTotal: Int,
+                targetSeconds: Int? = nil, withWeight: Bool = true) {
         self.phase = phase
         self.routine = routine
         self.exercise = exercise
@@ -126,6 +131,8 @@ public struct LiveActivityInput: Sendable {
         self.sessionStart = sessionStart
         self.workSetsDone = workSetsDone
         self.workSetsTotal = workSetsTotal
+        self.targetSeconds = targetSeconds
+        self.withWeight = withWeight
     }
 }
 
@@ -152,15 +159,21 @@ public enum LiveActivityText {
         return "\(base), \(value)."
     }
 
+    /// Valore del set accanto al nome: «62,5 × 10», a tempo «10 × 0:45» o «0:45».
+    public static func value(for input: LiveActivityInput) -> String? {
+        if let seconds = input.targetSeconds {
+            return TimedText.value(seconds: seconds, weight: input.withWeight ? (input.weight ?? 0) : nil)
+        }
+        guard let weight = input.weight, let reps = input.reps else { return nil }
+        return SessionText.weightReps(weight, reps)
+    }
+
     /// Contenuto della card in questo momento. `now` serve solo al recupero alla rovescia,
     /// per passare a «tempo in più» dopo lo zero.
     public static func state(for input: LiveActivityInput, now: Date) -> LiveActivityState {
         let kind = input.setKind ?? .work
         let setName = SessionText.shortName(kind, input.setNumber)
-        let value: String? = {
-            guard let weight = input.weight, let reps = input.reps else { return nil }
-            return SessionText.weightReps(weight, reps)
-        }()
+        let value = Self.value(for: input)
         let exercise = input.exercise ?? input.routine
 
         func make(_ tone: LiveActivityTone, label: String, title: String, setLabel: String, setValue: String?,
@@ -198,6 +211,14 @@ public enum LiveActivityText {
                         label: SessionText.countdownTitle(kind, input.setNumber),
                         title: exercise, setLabel: setName, setValue: value,
                         start: pauseStart, end: end, big: true, primary: nil)
+
+        case let .inSet(since) where input.targetSeconds != nil:
+            // Set a tempo: conto alla rovescia fino allo zero, con la barra (a zero si chiude da solo).
+            let end = since.addingTimeInterval(TimeInterval(input.targetSeconds ?? 0))
+            return make(.inSet, label: TimedText.inProgress(kind, input.setNumber), title: exercise,
+                        setLabel: "\(setName), obiettivo", setValue: value, start: since, end: end,
+                        progress: true,
+                        primary: LiveActivityButton(SessionText.doneTitle(kind, input.setNumber), .setDone))
 
         case let .inSet(since):
             return make(.inSet, label: SessionText.inProgress(kind, input.setNumber), title: exercise,

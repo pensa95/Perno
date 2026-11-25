@@ -22,16 +22,27 @@ extension WorkoutSession {
                 let traguardo = riga.kind == .approach
                     ? (numero - 1 < percentuali.count ? PrintText.percent(percentuali[numero - 1]) : "")
                     : obiettivo
-                return PrintText.sessionRow(kind: riga.kind, number: numero, target: traguardo,
-                                            done: riga.isDone,
-                                            weight: riga.weight.map { Units.show($0) },
-                                            reps: riga.reps, reserve: riga.reserve)
+                guard let obiettivoSecondi = riga.targetSeconds else {
+                    return PrintText.sessionRow(kind: riga.kind, number: numero, target: traguardo,
+                                                done: riga.isDone,
+                                                weight: riga.weight.map { Units.show($0) },
+                                                reps: riga.reps, reserve: riga.reserve)
+                }
+                // Set a tempo (UI v5): obiettivo e durata fatta al posto delle ripetizioni.
+                var fila = PrintText.sessionRow(kind: riga.kind, number: numero,
+                                                target: Clock.text(Double(obiettivoSecondi)), done: riga.isDone,
+                                                weight: esercizio.withWeight ? riga.weight.map { Units.show($0) } : nil,
+                                                reps: nil, reserve: nil)
+                if riga.isDone { fila.reps = Clock.text(Double(riga.seconds ?? obiettivoSecondi)) }
+                return fila
             }
             return PrintExercise(
                 number: indice + 1,
                 name: esercizio.name,
-                detail: EntrySummary.text(sets: lavoro, repsMin: esercizio.repsMin, repsMax: esercizio.repsMax,
-                                          approaches: esercizio.approachCount, fixedRest: esercizio.fixedRest),
+                detail: EntrySummary.text(measure: esercizio.measure, sets: lavoro, repsMin: esercizio.repsMin,
+                                          repsMax: esercizio.repsMax, approaches: esercizio.approachCount,
+                                          seconds: esercizio.targetSeconds, withWeight: esercizio.withWeight,
+                                          fixedRest: esercizio.fixedRest),
                 setup: esercizio.setup.isEmpty ? nil : esercizio.setup,
                 cues: Cues.split(esercizio.cues),
                 note: esercizio.note.isEmpty ? nil : esercizio.note,
@@ -63,12 +74,20 @@ extension Routine {
             PrintExercise(
                 number: indice + 1,
                 name: voce.exercise?.name ?? "Esercizio",
-                detail: EntrySummary.text(sets: voce.setCount, repsMin: voce.repsMin, repsMax: voce.repsMax,
-                                          approaches: voce.approachCount, fixedRest: voce.fixedRest),
+                detail: EntrySummary.text(measure: voce.measure, sets: voce.setCount, repsMin: voce.repsMin,
+                                          repsMax: voce.repsMax, approaches: voce.approachCount,
+                                          seconds: voce.targetSeconds, withWeight: voce.withWeight,
+                                          fixedRest: voce.fixedRest),
                 setup: voce.setup.isEmpty ? nil : voce.setup,
                 cues: Cues.split(voce.cues),
                 note: nil,
-                rows: PrintText.routineRows(sets: voce.setCount, repsMin: voce.repsMin, repsMax: voce.repsMax,
+                rows: voce.isTimed
+                    ? PrintText.routineRows(sets: voce.setCount, repsMin: 0, repsMax: 0, approaches: 0).map {
+                        var fila = $0
+                        fila.target = Clock.text(Double(voce.targetSeconds))
+                        return fila
+                    }
+                    : PrintText.routineRows(sets: voce.setCount, repsMin: voce.repsMin, repsMax: voce.repsMax,
                                             approaches: voce.approachCount))
         }
         return PrintSheet(kind: "Scheda", title: name.isEmpty ? "Scheda" : name, lines: [riassunto],

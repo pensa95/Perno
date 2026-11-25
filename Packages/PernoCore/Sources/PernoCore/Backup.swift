@@ -69,9 +69,14 @@ public struct BackupFile: Codable, Equatable, Sendable {
         public var fixedRest: Double?
         public var setup: String
         public var cues: String
+        /// Esercizi a tempo (v5); assenti nei backup precedenti = a ripetizioni.
+        public var measure: String?
+        public var targetSeconds: Int?
+        public var withWeight: Bool?
 
         public init(position: Int, exerciseID: UUID?, setCount: Int, repsMin: Int, repsMax: Int,
-                    approachCount: Int, fixedRest: Double?, setup: String, cues: String) {
+                    approachCount: Int, fixedRest: Double?, setup: String, cues: String,
+                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil) {
             self.position = position
             self.exerciseID = exerciseID
             self.setCount = setCount
@@ -81,6 +86,9 @@ public struct BackupFile: Codable, Equatable, Sendable {
             self.fixedRest = fixedRest
             self.setup = setup
             self.cues = cues
+            self.measure = measure
+            self.targetSeconds = targetSeconds
+            self.withWeight = withWeight
         }
     }
 
@@ -139,10 +147,15 @@ public struct BackupFile: Codable, Equatable, Sendable {
         public var note: String
         public var isPostponed: Bool
         public var sets: [SessionSet]
+        /// Esercizi a tempo (v5); assenti nei backup precedenti = a ripetizioni.
+        public var measure: String?
+        public var targetSeconds: Int?
+        public var withWeight: Bool?
 
         public init(position: Int, exerciseID: UUID?, name: String, repsMin: Int, repsMax: Int,
                     approachCount: Int, fixedRest: Double?, setup: String, cues: String, note: String,
-                    isPostponed: Bool, sets: [SessionSet]) {
+                    isPostponed: Bool, sets: [SessionSet],
+                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil) {
             self.position = position
             self.exerciseID = exerciseID
             self.name = name
@@ -155,6 +168,9 @@ public struct BackupFile: Codable, Equatable, Sendable {
             self.note = note
             self.isPostponed = isPostponed
             self.sets = sets
+            self.measure = measure
+            self.targetSeconds = targetSeconds
+            self.withWeight = withWeight
         }
     }
 
@@ -168,9 +184,13 @@ public struct BackupFile: Codable, Equatable, Sendable {
         public var reserve: Int?
         public var startedAt: Date?
         public var endedAt: Date?
+        /// Set a tempo (v5): durata obiettivo e fatta, in secondi.
+        public var targetSeconds: Int?
+        public var seconds: Int?
 
         public init(position: Int, kind: String, targetWeight: Double, targetReps: Int, weight: Double?,
-                    reps: Int?, reserve: Int?, startedAt: Date?, endedAt: Date?) {
+                    reps: Int?, reserve: Int?, startedAt: Date?, endedAt: Date?,
+                    targetSeconds: Int? = nil, seconds: Int? = nil) {
             self.position = position
             self.kind = kind
             self.targetWeight = targetWeight
@@ -180,6 +200,8 @@ public struct BackupFile: Codable, Equatable, Sendable {
             self.reserve = reserve
             self.startedAt = startedAt
             self.endedAt = endedAt
+            self.targetSeconds = targetSeconds
+            self.seconds = seconds
         }
     }
 

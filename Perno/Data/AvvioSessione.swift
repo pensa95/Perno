@@ -13,17 +13,28 @@ extension WorkoutSession {
             let esercizio = SessionExercise(position: indice, entry: voce)
             context.insert(esercizio)
             esercizio.session = sessione
-            let piano = SessionPlanner.plan(
-                workSets: voce.setCount,
-                repsMin: voce.repsMin,
-                repsMax: voce.repsMax,
-                approaches: voce.approachCount,
-                history: voce.exercise.map { storiaSetDiLavoro($0) } ?? [],
-                step: PlateStep.current
-            )
+            let piano: [PlannedSet]
+            var durata = voce.targetSeconds
+            if voce.isTimed {
+                // A tempo (UI v5): solo set di lavoro, peso dell'ultima volta se c'è «Con peso».
+                let ultimi = voce.exercise.map { ultimiSetATempo($0) } ?? []
+                let peso = voce.withWeight ? (ultimi.first?.weight ?? 0) : 0
+                piano = TimedPlan.sets(count: voce.setCount, weight: peso)
+                durata = TimedProgression.target(base: voce.targetSeconds, last: ultimi)
+            } else {
+                piano = SessionPlanner.plan(
+                    workSets: voce.setCount,
+                    repsMin: voce.repsMin,
+                    repsMax: voce.repsMax,
+                    approaches: voce.approachCount,
+                    history: voce.exercise.map { storiaSetDiLavoro($0) } ?? [],
+                    step: PlateStep.current
+                )
+            }
             for (posizione, set) in piano.enumerated() {
                 let registrato = SessionSet(position: posizione, kind: set.kind,
                                             targetWeight: set.weight, targetReps: set.reps)
+                if voce.isTimed { registrato.targetSeconds = durata }
                 context.insert(registrato)
                 registrato.sessionExercise = esercizio
             }
@@ -49,7 +60,8 @@ extension WorkoutSession {
             .sorted { ($0.session?.startedAt ?? .distantPast) > ($1.session?.startedAt ?? .distantPast) }
             .map { voce in
                 voce.orderedSets.compactMap { set -> Progression.WorkSet? in
-                    guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
+                    guard set.kind != .approach, set.isDone, set.targetSeconds == nil,
+                          let weight = set.weight, let reps = set.reps else { return nil }
                     return Progression.WorkSet(weight: weight, reps: reps, reserve: set.reserveRaw)
                 }
             }
@@ -67,9 +79,23 @@ extension WorkoutSession {
             .sorted { ($0.session?.startedAt ?? .distantPast) > ($1.session?.startedAt ?? .distantPast) }
         for voce in volte {
             let fatti = voce.orderedSets.compactMap { set -> (weight: Double, reps: Int)? in
-                guard set.kind != .approach, set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
+                guard set.kind != .approach, set.isDone, set.targetSeconds == nil,
+                      let weight = set.weight, let reps = set.reps else { return nil }
                 return (weight, reps)
             }
+            if !fatti.isEmpty { return fatti }
+        }
+        return []
+    }
+
+    /// Set a tempo fatti l'ultima volta per questo esercizio (UI v5): obiettivo, durata e peso.
+    /// Come per i set a ripetizioni, le volte senza set fatti non contano.
+    static func ultimiSetATempo(_ esercizio: Exercise) -> [TimedSet] {
+        let volte = esercizio.sessionExercises
+            .filter { $0.session?.endedAt != nil }
+            .sorted { ($0.session?.startedAt ?? .distantPast) > ($1.session?.startedAt ?? .distantPast) }
+        for voce in volte {
+            let fatti = voce.orderedSets.compactMap(\.setATempoFatto)
             if !fatti.isEmpty { return fatti }
         }
         return []

@@ -133,7 +133,7 @@ final class AttivitaLive {
         let contenuto = UNMutableNotificationContent()
         contenuto.title = LiveActivityText.restOverTitle
         let nomeSet = SessionText.shortName(ingresso.setKind ?? .work, ingresso.setNumber)
-        let valore = ingresso.weight.flatMap { peso in ingresso.reps.map { SessionText.weightReps(peso, $0) } }
+        let valore = LiveActivityText.value(for: ingresso)
         contenuto.body = LiveActivityText.restOverBody(setName: nomeSet, exercise: ingresso.exercise ?? ingresso.routine,
                                                        value: valore)
         contenuto.sound = .default
@@ -170,7 +170,9 @@ extension SessioneInCorso {
             awaitingChoice: daScegliere,
             sessionStart: sessione.startedAt,
             workSetsDone: totali.fatti,
-            workSetsTotal: totali.totale
+            workSetsTotal: totali.totale,
+            targetSeconds: indice.flatMap { aTempo($0) ? corrente.map(obiettivoSecondi) : nil },
+            withWeight: esercizio?.withWeight ?? true
         )
     }
 }

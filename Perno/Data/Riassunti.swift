@@ -37,11 +37,11 @@ extension WorkoutSession {
     /// Durata da inizio a fine (fino ad adesso se è in corso).
     var durata: TimeInterval { (endedAt ?? .now).timeIntervalSince(startedAt) }
 
-    /// Chili sollevati nei set fatti, avvicinamenti esclusi.
+    /// Chili sollevati nei set fatti, avvicinamenti e set a tempo esclusi.
     var chiliSollevati: Double {
-        HomeText.liftedKilograms(exercises.flatMap(\.sets).compactMap { set -> (kind: SetKind, weight: Double, reps: Int)? in
+        SessionSummary.liftedKilogramsExcludingTimed(exercises.flatMap(\.sets).compactMap { set in
             guard set.isDone, let weight = set.weight, let reps = set.reps else { return nil }
-            return (set.kind, weight, reps)
+            return (set.kind, weight, reps, set.aTempo)
         })
     }
 
@@ -78,23 +78,30 @@ extension WorkoutSession {
 
     /// Record di oggi: per esercizio, il set con il massimale stimato più alto di sempre
     /// (confrontato con le sessioni chiuse prima di questa).
+    /// Per gli esercizi a tempo il record è la durata più lunga (UI v5).
     var record: [SessionSummary.Record] {
         orderedExercises.compactMap { voce in
             guard let esercizio = voce.exercise else { return nil }
-            let oggi = voce.sets.compactMap(Self.alzata)
-            let prima = esercizio.sessionExercises
+            let primaSet = esercizio.sessionExercises
                 .filter { altra in
                     guard let sessione = altra.session else { return false }
                     return sessione.id != self.id && sessione.endedAt != nil && sessione.startedAt < self.startedAt
                 }
                 .flatMap(\.sets)
-                .compactMap(Self.alzata)
-            return SessionSummary.record(exercise: voce.name, today: oggi, previous: prima)
+            if voce.isTimed {
+                return SessionSummary.timedRecord(exercise: voce.name,
+                                                  today: voce.sets.compactMap(\.setATempoFatto),
+                                                  previous: primaSet.compactMap(\.setATempoFatto),
+                                                  withWeight: voce.withWeight)
+            }
+            return SessionSummary.record(exercise: voce.name, today: voce.sets.compactMap(Self.alzata),
+                                         previous: primaSet.compactMap(Self.alzata))
         }
     }
 
     private static func alzata(_ set: SessionSet) -> SessionSummary.Lift? {
-        guard set.isDone, set.kind != .approach, let peso = set.weight, let ripetizioni = set.reps else { return nil }
+        guard set.isDone, set.kind != .approach, !set.aTempo,
+              let peso = set.weight, let ripetizioni = set.reps else { return nil }
         return SessionSummary.Lift(weight: peso, reps: ripetizioni)
     }
 
@@ -118,10 +125,17 @@ extension WorkoutSession {
     /// Nello storico: chiusa, esclusa quella chiusa da sola e non ancora salvata.
     var nelloStorico: Bool { endedAt != nil && !(closedAutomatically && !isSaved) }
 
-    /// Set di lavoro fatti di un esercizio, come alzate (pesi in chili).
+    /// Set di lavoro fatti di un esercizio, come alzate (pesi in chili). Per un esercizio a tempo
+    /// (UI v5) le ripetizioni dell'alzata sono i secondi fatti (vedi `ExerciseHistory.Exercise.timed`).
     static func alzate(_ voce: SessionExercise) -> [SessionSummary.Lift] {
-        voce.orderedSets.compactMap { set in
-            guard set.isDone, set.kind != .approach, let peso = set.weight, let ripetizioni = set.reps else { return nil }
+        if voce.isTimed {
+            return voce.orderedSets.compactMap(\.setATempoFatto).map {
+                SessionSummary.Lift(weight: voce.withWeight ? $0.weight : 0, reps: $0.seconds)
+            }
+        }
+        return voce.orderedSets.compactMap { set in
+            guard set.isDone, set.kind != .approach, !set.aTempo,
+                  let peso = set.weight, let ripetizioni = set.reps else { return nil }
             return SessionSummary.Lift(weight: peso, reps: ripetizioni)
         }
     }
@@ -129,13 +143,23 @@ extension WorkoutSession {
 
 extension Exercise {
     /// Volte nello storico, dalla più recente: sessione e set di lavoro fatti.
+    /// Se l'esercizio è stato usato sia a ripetizioni sia a tempo, valgono le volte fatte come l'ultima.
     var volteNelloStorico: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])] {
-        sessionExercises.compactMap { voce -> (sessione: WorkoutSession, alzate: [SessionSummary.Lift])? in
-            guard let sessione = voce.session, sessione.nelloStorico else { return nil }
+        let aTempo = ultimaVoltaATempo
+        return sessionExercises.compactMap { voce -> (sessione: WorkoutSession, alzate: [SessionSummary.Lift])? in
+            guard voce.isTimed == aTempo, let sessione = voce.session, sessione.nelloStorico else { return nil }
             let alzate = WorkoutSession.alzate(voce)
             return alzate.isEmpty ? nil : (sessione, alzate)
         }
         .sorted { $0.sessione.startedAt > $1.sessione.startedAt }
+    }
+
+    /// L'ultima volta nello storico (con set fatti) era a tempo (UI v5).
+    var ultimaVoltaATempo: Bool {
+        sessionExercises
+            .filter { voce in voce.session?.nelloStorico == true && voce.sets.contains { $0.isDone } }
+            .max { ($0.session?.startedAt ?? .distantPast) < ($1.session?.startedAt ?? .distantPast) }?
+            .isTimed ?? false
     }
 
     /// L'esercizio come lo vede lo Storico (record, ultima volta, grafico).
@@ -145,7 +169,7 @@ extension Exercise {
     func storico(da volte: [(sessione: WorkoutSession, alzate: [SessionSummary.Lift])]) -> ExerciseHistory.Exercise<UUID> {
         ExerciseHistory.Exercise(id: id, name: name, entries: volte.map {
             ExerciseHistory.Entry(date: $0.sessione.startedAt, lifts: $0.alzate)
-        })
+        }, timed: ultimaVoltaATempo)
     }
 
     /// Recupero abituale dai recuperi registrati (esclusi avvicinamenti e cambi).
@@ -156,5 +180,28 @@ extension Exercise {
             .sorted { $0.start < $1.start }
             .map(\.duration)
         return SessionStats.usualRest(restDurations: durate)
+    }
+}
+
+// MARK: - Set a tempo (UI v5)
+
+extension SessionSet {
+    /// Set di un esercizio a tempo (ha una durata obiettivo).
+    var aTempo: Bool { targetSeconds != nil }
+
+    /// Set a tempo fatto (avvicinamenti esclusi): obiettivo, durata fatta e peso.
+    var setATempoFatto: TimedSet? {
+        guard isDone, kind != .approach, let obiettivo = targetSeconds else { return nil }
+        return TimedSet(target: obiettivo, seconds: seconds ?? obiettivo, weight: weight ?? targetWeight)
+    }
+
+    /// Valore da mostrare: «62,5 × 10», a tempo «10 × 0:45» o «0:45» (fatto o obiettivo).
+    var testoValore: String {
+        let peso = isDone ? (weight ?? targetWeight) : targetWeight
+        if let obiettivo = targetSeconds {
+            let secondi = isDone ? (seconds ?? obiettivo) : obiettivo
+            return TimedText.value(seconds: secondi, weight: sessionExercise?.withWeight == true ? peso : nil)
+        }
+        return SessionText.weightReps(peso, isDone ? (reps ?? targetReps) : targetReps)
     }
 }

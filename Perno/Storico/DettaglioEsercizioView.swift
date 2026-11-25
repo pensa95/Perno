@@ -51,7 +51,7 @@ struct DettaglioEsercizioView: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 titolo.padding(.top, 16)
                 if let migliore = storico.record {
-                    bloccoRecord(migliore.lift, data: migliore.date).padding(.top, 20)
+                    bloccoRecord(migliore.lift, data: migliore.date, storico: storico).padding(.top, 20)
                 }
                 numeri(storico).padding(.top, 16)
                 scarico(storico)
@@ -84,7 +84,8 @@ struct DettaglioEsercizioView: View {
     }
 
     /// Blocco grafite: coppa sul quadrato giallo, «Record personale», «65 × 8», data e massimale stimato.
-    private func bloccoRecord(_ alzata: SessionSummary.Lift, data: Date) -> some View {
+    private func bloccoRecord(_ alzata: SessionSummary.Lift, data: Date,
+                              storico: ExerciseHistory.Exercise<UUID>) -> some View {
         HStack(spacing: 16) {
             Image(systemName: "trophy")
                 .font(.system(size: 22, weight: .semibold))
@@ -96,13 +97,14 @@ struct DettaglioEsercizioView: View {
                 Text("Record personale")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.piastraTenue)
-                Text(SessionText.weightReps(alzata.weight, alzata.reps))
+                Text(storico.text(alzata))
                     .font(.piastra(48))
                     .monospacedDigit()
                     .foregroundStyle(Color.piastraTesto)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(ExerciseDetail.recordDetail(alzata, date: data))
+                Text(storico.timed ? ExerciseDetail.timedRecordDetail(date: data)
+                                   : ExerciseDetail.recordDetail(alzata, date: data))
                     .font(.footnote)
                     .foregroundStyle(Color.piastraTenue)
             }
@@ -117,7 +119,7 @@ struct DettaglioEsercizioView: View {
 
     private func numeri(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            numero(storico.last.map { SessionText.weightReps($0.lift.weight, $0.lift.reps) } ?? "—", "ultima volta")
+            numero(storico.last.map { storico.text($0.lift) } ?? "—", "ultima volta")
             numero(String(ExerciseDetail.sessionCount(storico)), "sessioni")
             numero(esercizio.recuperoAbituale.map { HomeText.duration($0) } ?? "—", "recupero abituale")
         }
@@ -144,7 +146,8 @@ struct DettaglioEsercizioView: View {
     /// Esercizio fermo da almeno 3 settimane: proposta di una settimana di scarico.
     @ViewBuilder
     private func scarico(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
-        if let settimane = storico.stalledWeeks(today: .now), let ultima = storico.last {
+        // La settimana di scarico riguarda il peso: non per gli esercizi a tempo.
+        if !storico.timed, let settimane = storico.stalledWeeks(today: .now), let ultima = storico.last {
             let proposta = ExerciseHistory.deloadAdvice(weeks: settimane, lastWeight: ultima.lift.weight,
                                                         step: PlateStep.current)
             HStack(alignment: .top, spacing: 12) {
@@ -176,13 +179,15 @@ struct DettaglioEsercizioView: View {
 
     private func grafico(_ storico: ExerciseHistory.Exercise<UUID>) -> some View {
         let punti = ExerciseDetail.points(ExerciseDetail.points(storico), in: periodo, today: .now)
+        let variazione = storico.timed ? ExerciseDetail.timedChange(punti, range: periodo)
+                                       : ExerciseDetail.change(punti, range: periodo)
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Massimale stimato")
+                Text(storico.timed ? "Durata più lunga" : "Massimale stimato")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.inchiostro)
                 Spacer(minLength: 8)
-                if let variazione = ExerciseDetail.change(punti, range: periodo) {
+                if let variazione {
                     Text(variazione)
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(Color.inchiostroTenue)
@@ -191,7 +196,7 @@ struct DettaglioEsercizioView: View {
             SelettoreSegmenti(valori: ExerciseDetail.Range.allCases, selezione: $periodo) { $0.label }
             Group {
                 if punti.count >= 2 {
-                    curva(punti)
+                    curva(punti, aTempo: storico.timed)
                 } else {
                     Text("Servono almeno due sessioni in questo periodo.")
                         .font(.subheadline)
@@ -208,21 +213,23 @@ struct DettaglioEsercizioView: View {
     }
 
     /// Linea inchiostro del massimale stimato; l'ultimo punto col perno giallo. Asse dei valori a destra.
-    private func curva(_ punti: [ExerciseDetail.Point]) -> some View {
-        let valori = punti.map { Units.unit.fromKilograms($0.estimatedMax) }
+    /// A tempo (UI v5) i valori sono la durata più lunga in secondi, scritta come «0:45».
+    private func curva(_ punti: [ExerciseDetail.Point], aTempo: Bool = false) -> some View {
+        let valore: (ExerciseDetail.Point) -> Double = { aTempo ? $0.estimatedMax : Units.unit.fromKilograms($0.estimatedMax) }
+        let valori = punti.map(valore)
         let minimo = valori.min() ?? 0
         let massimo = valori.max() ?? 0
         let margine = max(2, (massimo - minimo) * 0.15)
         return Chart {
             ForEach(Array(punti.enumerated()), id: \.offset) { _, punto in
                 LineMark(x: .value("Data", punto.date),
-                         y: .value("Massimale", Units.unit.fromKilograms(punto.estimatedMax)))
+                         y: .value("Massimale", valore(punto)))
                     .foregroundStyle(Color.inchiostro)
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
             }
             if let ultimo = punti.last {
                 PointMark(x: .value("Data", ultimo.date),
-                          y: .value("Massimale", Units.unit.fromKilograms(ultimo.estimatedMax)))
+                          y: .value("Massimale", valore(ultimo)))
                     .symbol {
                         Circle()
                             .fill(Color.perno)
@@ -238,7 +245,7 @@ struct DettaglioEsercizioView: View {
                     .foregroundStyle(Color.linea)
                 AxisValueLabel {
                     if let numero = valore.as(Double.self) {
-                        Text(String(Int(numero.rounded())))
+                        Text(aTempo ? Clock.text(numero) : String(Int(numero.rounded())))
                             .font(.caption2)
                             .foregroundStyle(Color.inchiostroTenue)
                     }
@@ -258,7 +265,12 @@ struct DettaglioEsercizioView: View {
         }
         .frame(height: 180)
         .accessibilityElement()
-        .accessibilityLabel(accessibilita(valori))
+        .accessibilityLabel(aTempo ? accessibilitaATempo(valori) : accessibilita(valori))
+    }
+
+    private func accessibilitaATempo(_ valori: [Double]) -> String {
+        guard let primo = valori.first, let ultimo = valori.last else { return "Durata più lunga" }
+        return "Durata più lunga da \(Clock.text(primo)) a \(Clock.text(ultimo)), \(periodo.label)"
     }
 
     private static func meseCorto(_ data: Date) -> String {
@@ -335,7 +347,7 @@ struct DettaglioEsercizioView: View {
                     ForEach(Array(volte.prefix(Self.ultimeSessioni).enumerated()), id: \.offset) { _, volta in
                         RigaSessioneEsercizio(sessione: volta.sessione, alzate: volta.alzate,
                                               record: record.contains(volta.sessione.startedAt),
-                                              indietro: esercizio.name)
+                                              indietro: esercizio.name, aTempo: esercizio.ultimaVoltaATempo)
                     }
                 }
             }
@@ -351,6 +363,14 @@ struct RigaSessioneEsercizio: View {
     let alzate: [SessionSummary.Lift]
     let record: Bool
     let indietro: String
+    /// Esercizio a tempo (UI v5): le ripetizioni delle alzate sono i secondi.
+    var aTempo = false
+
+    private var testoSet: String {
+        guard aTempo else { return ExerciseDetail.rowSets(alzate) }
+        return alzate.map { TimedText.value(seconds: $0.reps, weight: $0.weight > 0 ? $0.weight : nil) }
+            .joined(separator: " · ")
+    }
 
     var body: some View {
         NavigationLink(value: RottaStorico.sessione(sessione.id, indietro: indietro)) {
@@ -359,7 +379,7 @@ struct RigaSessioneEsercizio: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.inchiostro)
                     .frame(width: 84, alignment: .leading)
-                Text(ExerciseDetail.rowSets(alzate))
+                Text(testoSet)
                     .font(.piastra(18, peso: .medium))
                     .monospacedDigit()
                     .foregroundStyle(Color.inchiostro)
@@ -405,7 +425,7 @@ struct SessioniEsercizioView: View {
                     ForEach(Array(volte.enumerated()), id: \.offset) { _, volta in
                         RigaSessioneEsercizio(sessione: volta.sessione, alzate: volta.alzate,
                                               record: record.contains(volta.sessione.startedAt),
-                                              indietro: "Sessioni")
+                                              indietro: "Sessioni", aTempo: esercizio.ultimaVoltaATempo)
                     }
                 }
                 .padding(.top, 20)

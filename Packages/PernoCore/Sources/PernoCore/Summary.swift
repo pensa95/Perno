@@ -24,17 +24,25 @@ public enum SessionSummary {
     public struct Record: Equatable, Sendable {
         public var exercise: String
         public var lift: Lift
+        /// Record a tempo (UI v5): durata più lunga in secondi; `nil` per i record a ripetizioni.
+        public var seconds: Int?
+        public var withWeight: Bool
 
-        public init(exercise: String, lift: Lift) {
+        public init(exercise: String, lift: Lift, seconds: Int? = nil, withWeight: Bool = true) {
             self.exercise = exercise
             self.lift = lift
+            self.seconds = seconds
+            self.withWeight = withWeight
         }
 
         /// «Record su Lat machine».
         public var title: String { "Record su \(exercise)" }
 
-        /// «55 × 10, massimale stimato 73 kg».
+        /// «55 × 10, massimale stimato 73 kg»; a tempo «10 × 0:55, durata più lunga».
         public var detail: String {
+            if let seconds {
+                return "\(TimedText.value(seconds: seconds, weight: withWeight ? lift.weight : nil)), durata più lunga"
+            }
             let max = Int(Units.unit.fromKilograms(lift.estimatedMax).rounded())
             return "\(SessionText.weightReps(lift.weight, lift.reps)), massimale stimato \(max) \(Units.unit.symbol)"
         }
