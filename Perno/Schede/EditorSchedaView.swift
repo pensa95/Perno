@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 import PernoCore
 
-/// J Editor scheda: nome, riepilogo, esercizi (tieni premuto per spostare), «Aggiungi esercizio»,
+/// J Editor scheda: nome, riepilogo, esercizi (tieni premuto per spostare, scorri a sinistra per «Rimuovi»), «Aggiungi esercizio»,
 /// «Nel piano settimanale»; Duplica ed Elimina nel menu «…». Le modifiche si salvano da sole.
 struct EditorSchedaView: View {
     @Bindable var scheda: Routine
@@ -71,6 +71,14 @@ struct EditorSchedaView: View {
                     rigaEsercizio(esercizio, numero: indice + 1)
                 }
                 .buttonStyle(.plain)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        rimuovi(esercizio)
+                    } label: {
+                        Label("Rimuovi", systemImage: "trash")
+                    }
+                    .tint(Color.errore)
+                }
                 .riga(sopra: 2, sotto: 2)
             }
             .onMove(perform: sposta)
@@ -187,6 +195,18 @@ struct EditorSchedaView: View {
         let entry = RoutineEntry(position: esercizi.count, exercise: esercizio)
         context.insert(entry)
         entry.routine = scheda
+        salva()
+    }
+
+    /// Scorrimento a sinistra sulla card → «Rimuovi»: toglie l'esercizio dalla scheda e rinumera gli altri.
+    private func rimuovi(_ esercizio: RoutineEntry) {
+        let rimasti = esercizi.filter { $0 !== esercizio }
+        withAnimation {
+            context.delete(esercizio)
+            for (indice, rimasto) in rimasti.enumerated() {
+                rimasto.position = indice
+            }
+        }
         salva()
     }
 
