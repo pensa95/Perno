@@ -4,7 +4,8 @@ import PernoCore
 /// Correggi set (tavola 8): peso e ripetizioni in due blocchi grandi con −/+ (tocco sul numero =
 /// tastierino), «Altri dettagli» chiuso con tipo di set e riserva, «Salva» giallo, «Elimina set» rosso.
 /// La X chiude senza salvare. Su un set da fare (anche quello di adesso) cambia l'obiettivo:
-/// niente riserva né «Elimina set».
+/// niente riserva né «Elimina set». Set a tempo (UI v5): peso (solo con «Con peso») e durata,
+/// a passi di 5 s; niente riserva.
 struct CorreggiSetView: View {
     let sessione: SessioneInCorso
     let esercizio: Int
@@ -20,6 +21,8 @@ struct CorreggiSetView: View {
     @State private var scriviRipetizioni = false
     @State private var testo = ""
     @State private var chiediEliminazione = false
+    @State private var secondi: Int
+    @State private var scriviSecondi = false
 
     private let passo = PlateStep.current
 
@@ -32,7 +35,11 @@ struct CorreggiSetView: View {
         _ripetizioni = State(initialValue: set.reps ?? set.targetReps)
         _tipo = State(initialValue: set.kind)
         _riserva = State(initialValue: set.reserve)
+        _secondi = State(initialValue: set.seconds ?? sessione.obiettivoSecondi(set))
     }
+
+    private var aTempo: Bool { sessione.aTempo(esercizio) }
+    private var conPeso: Bool { !aTempo || sessione.esercizi[esercizio].withWeight }
 
     private var set: SessionSet { sessione.set[esercizio][indice] }
 
@@ -65,6 +72,7 @@ struct CorreggiSetView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     HStack(spacing: 8) {
+                        if conPeso {
                         blocco(titolo: "Peso, \(Units.unit.symbol)", valore: Units.show(peso),
                                meno: "Meno \(Weights.format(Units.step)) \(Units.unit.symbol)",
                                piu: "Più \(Weights.format(Units.step)) \(Units.unit.symbol)",
@@ -75,6 +83,18 @@ struct CorreggiSetView: View {
                                    scriviPeso = true
                                },
                                cambia: { verso in peso = SetCorrection.stepWeight(peso, by: verso * passo) })
+                        }
+                        if aTempo {
+                            blocco(titolo: "Durata", valore: Clock.text(Double(secondi)),
+                                   meno: "Cinque secondi in meno", piu: "Cinque secondi in più",
+                                   menoAttivo: secondi > DurationLimits.range.lowerBound,
+                                   piuAttivo: secondi < DurationLimits.range.upperBound,
+                                   tocco: {
+                                       testo = Clock.text(Double(secondi))
+                                       scriviSecondi = true
+                                   },
+                                   cambia: { verso in secondi = DurationLimits.stepped(secondi, by: Int(verso)) })
+                        } else {
                         blocco(titolo: "Ripetizioni", valore: "\(ripetizioni)",
                                meno: "Una ripetizione in meno", piu: "Una ripetizione in più",
                                menoAttivo: ripetizioni > EntryLimits.reps.lowerBound,
@@ -86,6 +106,7 @@ struct CorreggiSetView: View {
                                cambia: { verso in
                                    ripetizioni = EntryLimits.clamp(ripetizioni + Int(verso), EntryLimits.reps)
                                })
+                        }
                     }
                     Text("Tocca un numero per scriverlo con il tastierino.")
                         .font(.footnote)
@@ -100,7 +121,7 @@ struct CorreggiSetView: View {
 
             PulsanteGiallo(titolo: "Salva") {
                 sessione.correggi(esercizio: esercizio, set: indice, peso: peso, ripetizioni: ripetizioni,
-                                  tipo: tipo, riserva: riserva)
+                                  tipo: tipo, riserva: aTempo ? nil : riserva, secondi: aTempo ? secondi : nil)
                 dismiss()
             }
             if fatto {
@@ -127,6 +148,14 @@ struct CorreggiSetView: View {
             Button("Annulla", role: .cancel) {}
             Button("OK") {
                 if let valore = SetCorrection.parseWeight(testo) { peso = valore }
+            }
+        }
+        .alert("Durata", isPresented: $scriviSecondi) {
+            TextField("0:45", text: $testo)
+                .keyboardType(.numbersAndPunctuation)
+            Button("Annulla", role: .cancel) {}
+            Button("OK") {
+                if let valore = TimedText.parse(testo) { secondi = valore }
             }
         }
         .alert("Ripetizioni", isPresented: $scriviRipetizioni) {
@@ -206,7 +235,7 @@ struct CorreggiSetView: View {
                         Text("Altri dettagli")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(Color.inchiostro)
-                        Text(SetCorrection.details(kind: tipo, reserve: fatto ? riserva : nil))
+                        Text(SetCorrection.details(kind: tipo, reserve: fatto && !aTempo ? riserva : nil))
                             .font(.footnote)
                             .foregroundStyle(Color.inchiostroTenue)
                     }
@@ -230,7 +259,7 @@ struct CorreggiSetView: View {
                         }
                     }
                 }
-                if fatto {
+                if fatto && !aTempo {
                     EtichettaSezione("Quante ne avevi ancora?")
                     HStack(spacing: 6) {
                         ForEach(Reserve.allCases, id: \.self) { valore in

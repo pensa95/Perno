@@ -150,6 +150,9 @@ struct DockSessione: View {
     var bordoSopra = false
     /// Tocco sul tempo (recupero: cronometro ↔ conto alla rovescia), con l'icona accanto.
     var azioneTempo: (() -> Void)? = nil
+    /// Set a tempo (UI v5): «di 0:45» a destra del tempo e barra di avanzamento (0…1) sotto.
+    var notaTempo: String? = nil
+    var avanzamento: Double? = nil
 
     /// Pulsante principale: 19 e 15 pt come nelle tavole, che crescono con «Testo più grande».
     @ScaledMetric(relativeTo: .title3) private var dimensioneTitolo: CGFloat = 19
@@ -165,7 +168,9 @@ struct DockSessione: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        // Con la barra del set a tempo gli spazi si stringono, così il dock resta alto 224 pt.
+        VStack(alignment: .leading, spacing: avanzamento == nil ? 24 : 12) {
+            VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .bottom, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(etichetta)
@@ -188,6 +193,14 @@ struct DockSessione: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if let notaTempo {
+                    Text(notaTempo)
+                        .font(.footnote.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(coloreEtichetta)
+                        .lineLimit(1)
+                        .padding(.bottom, 4)
+                }
                 if let secondario {
                     Button(action: secondario.azione) {
                         Text(secondario.titolo)
@@ -200,6 +213,10 @@ struct DockSessione: View {
                     .buttonStyle(.plain)
                     .padding(.bottom, 4)
                 }
+            }
+            if let avanzamento {
+                BarraAvanzamento(valore: avanzamento, colore: coloreTesto)
+            }
             }
             if let principale {
                 Button(action: principale.azione) {
@@ -227,7 +244,7 @@ struct DockSessione: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.top, 20)
+        .padding(.top, avanzamento == nil ? 20 : 18)
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity, minHeight: 224, maxHeight: 224, alignment: .top)
@@ -238,5 +255,23 @@ struct DockSessione: View {
                 .fill(sfondo)
                 .shadow(color: bordoSopra ? Color.inchiostro.opacity(0.08) : .clear, radius: 0, x: 0, y: -1)
         }
+    }
+}
+
+/// Barra del set a tempo (UI v5): parte passata nel colore del testo, il resto in trasparenza.
+struct BarraAvanzamento: View {
+    let valore: Double
+    let colore: Color
+
+    var body: some View {
+        GeometryReader { spazio in
+            ZStack(alignment: .leading) {
+                Capsule().fill(colore.opacity(0.14))
+                Capsule().fill(colore)
+                    .frame(width: spazio.size.width * min(1, max(0, valore)))
+            }
+        }
+        .frame(height: 6)
+        .accessibilityHidden(true)
     }
 }

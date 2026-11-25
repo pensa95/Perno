@@ -13,17 +13,25 @@ extension WorkoutSession {
             let esercizio = SessionExercise(position: indice, entry: voce)
             context.insert(esercizio)
             esercizio.session = sessione
-            let piano = SessionPlanner.plan(
-                workSets: voce.setCount,
-                repsMin: voce.repsMin,
-                repsMax: voce.repsMax,
-                approaches: voce.approachCount,
-                history: voce.exercise.map { storiaSetDiLavoro($0) } ?? [],
-                step: PlateStep.current
-            )
+            let piano: [PlannedSet]
+            if voce.isTimed {
+                // A tempo (UI v5): solo set di lavoro, peso dell'ultima volta se c'è «Con peso».
+                let peso = voce.withWeight ? (voce.exercise.map { ultimiSetDiLavoro($0) }?.first?.weight ?? 0) : 0
+                piano = TimedPlan.sets(count: voce.setCount, weight: peso)
+            } else {
+                piano = SessionPlanner.plan(
+                    workSets: voce.setCount,
+                    repsMin: voce.repsMin,
+                    repsMax: voce.repsMax,
+                    approaches: voce.approachCount,
+                    history: voce.exercise.map { storiaSetDiLavoro($0) } ?? [],
+                    step: PlateStep.current
+                )
+            }
             for (posizione, set) in piano.enumerated() {
                 let registrato = SessionSet(position: posizione, kind: set.kind,
                                             targetWeight: set.weight, targetReps: set.reps)
+                if voce.isTimed { registrato.targetSeconds = voce.targetSeconds }
                 context.insert(registrato)
                 registrato.sessionExercise = esercizio
             }
