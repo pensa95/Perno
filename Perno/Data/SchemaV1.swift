@@ -8,7 +8,8 @@ import PernoCore
 // - gli elenchi ordinati hanno `position`, perché le relazioni SwiftData non hanno ordine;
 // - la sessione copia i dati della scheda (nome, intervallo, regolazioni): la sessione non
 //   modifica mai la scheda e lo storico non cambia se la scheda cambia.
-// Per cambiare il modello si aggiunge uno SchemaV2 con una tappa in `PernoMigrationPlan`.
+// Per cambiare il modello si aggiunge una nuova versione con una tappa in `PernoMigrationPlan`.
+// La v1 resta com'è: serve alla migrazione dei dati già sul telefono (versione attuale: `SchemaV2`).
 
 enum SchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
@@ -348,13 +349,3 @@ extension SchemaV1 {
         var duration: TimeInterval { end.timeIntervalSince(start) }
     }
 }
-
-// Nomi usati nel resto dell'app: puntano sempre alla versione corrente dello schema.
-typealias Exercise = SchemaV1.Exercise
-typealias Routine = SchemaV1.Routine
-typealias RoutineEntry = SchemaV1.RoutineEntry
-typealias PlanDay = SchemaV1.PlanDay
-typealias WorkoutSession = SchemaV1.WorkoutSession
-typealias SessionExercise = SchemaV1.SessionExercise
-typealias SessionSet = SchemaV1.SessionSet
-typealias SessionPause = SchemaV1.SessionPause

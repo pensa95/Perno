@@ -164,9 +164,10 @@ struct EditorSchedaView: View {
                 Text(esercizio.exercise?.name ?? "Esercizio eliminato")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.inchiostro)
-                Text(EntrySummary.text(sets: esercizio.setCount, repsMin: esercizio.repsMin,
-                                       repsMax: esercizio.repsMax, approaches: esercizio.approachCount,
-                                       fixedRest: esercizio.fixedRest))
+                Text(EntrySummary.text(measure: esercizio.measure, sets: esercizio.setCount,
+                                       repsMin: esercizio.repsMin, repsMax: esercizio.repsMax,
+                                       approaches: esercizio.approachCount, seconds: esercizio.targetSeconds,
+                                       withWeight: esercizio.withWeight, fixedRest: esercizio.fixedRest))
                     .font(.footnote)
                     .foregroundStyle(Color.inchiostroTenue)
             }
@@ -217,7 +218,9 @@ struct EditorSchedaView: View {
             let entry = RoutineEntry(position: originale.position, exercise: originale.exercise,
                                      setCount: originale.setCount, repsMin: originale.repsMin,
                                      repsMax: originale.repsMax, approachCount: originale.approachCount,
-                                     fixedRest: originale.fixedRest, setup: originale.setup, cues: originale.cues)
+                                     fixedRest: originale.fixedRest, setup: originale.setup, cues: originale.cues,
+                                     measure: originale.measure, targetSeconds: originale.targetSeconds,
+                                     withWeight: originale.withWeight)
             context.insert(entry)
             entry.routine = copia
         }

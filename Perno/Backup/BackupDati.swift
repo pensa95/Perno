@@ -6,9 +6,9 @@ import PernoCore
 extension BackupFile {
     /// Fotografia di tutti i dati dell'app.
     static func dalDatabase(_ context: ModelContext, alle ora: Date = .now) throws -> BackupFile {
-        let esercizi = try context.fetch(FetchDescriptor<SchemaV1.Exercise>(sortBy: [SortDescriptor(\.createdAt)]))
-        let schede = try context.fetch(FetchDescriptor<SchemaV1.Routine>(sortBy: [SortDescriptor(\.createdAt)]))
-        let giorni = try context.fetch(FetchDescriptor<SchemaV1.PlanDay>(sortBy: [SortDescriptor(\.weekday)]))
+        let esercizi = try context.fetch(FetchDescriptor<SchemaV2.Exercise>(sortBy: [SortDescriptor(\.createdAt)]))
+        let schede = try context.fetch(FetchDescriptor<SchemaV2.Routine>(sortBy: [SortDescriptor(\.createdAt)]))
+        let giorni = try context.fetch(FetchDescriptor<SchemaV2.PlanDay>(sortBy: [SortDescriptor(\.weekday)]))
         let sessioni = try context.fetch(FetchDescriptor<WorkoutSession>(sortBy: [SortDescriptor(\.startedAt)]))
 
         return BackupFile(
@@ -22,7 +22,8 @@ extension BackupFile {
                         entries: scheda.orderedEntries.map {
                             Entry(position: $0.position, exerciseID: $0.exercise?.id, setCount: $0.setCount,
                                   repsMin: $0.repsMin, repsMax: $0.repsMax, approachCount: $0.approachCount,
-                                  fixedRest: $0.fixedRest, setup: $0.setup, cues: $0.cues)
+                                  fixedRest: $0.fixedRest, setup: $0.setup, cues: $0.cues,
+                                  measure: $0.measureRaw, targetSeconds: $0.targetSeconds, withWeight: $0.withWeight)
                         })
             },
             planDays: giorni.map { PlanDay(weekday: $0.weekday, routineID: $0.routine?.id) },
@@ -43,8 +44,11 @@ extension BackupFile {
                                                 SessionSet(position: $0.position, kind: $0.kindRaw,
                                                            targetWeight: $0.targetWeight, targetReps: $0.targetReps,
                                                            weight: $0.weight, reps: $0.reps, reserve: $0.reserveRaw,
-                                                           startedAt: $0.startedAt, endedAt: $0.endedAt)
-                                            })
+                                                           startedAt: $0.startedAt, endedAt: $0.endedAt,
+                                                           targetSeconds: $0.targetSeconds, seconds: $0.seconds)
+                                            },
+                                            measure: esercizio.measureRaw, targetSeconds: esercizio.targetSeconds,
+                                            withWeight: esercizio.withWeight)
                         },
                         pauses: sessione.orderedPauses.map {
                             Pause(kind: $0.kindRaw, exercisePosition: $0.sessionExercise?.position,
@@ -57,14 +61,14 @@ extension BackupFile {
     /// «Ripristina»: sostituisce tutti i dati del telefono con quelli del backup.
     func ripristina(in context: ModelContext) throws {
         for sessione in try context.fetch(FetchDescriptor<WorkoutSession>()) { context.delete(sessione) }
-        for giorno in try context.fetch(FetchDescriptor<SchemaV1.PlanDay>()) { context.delete(giorno) }
-        for scheda in try context.fetch(FetchDescriptor<SchemaV1.Routine>()) { context.delete(scheda) }
-        for esercizio in try context.fetch(FetchDescriptor<SchemaV1.Exercise>()) { context.delete(esercizio) }
+        for giorno in try context.fetch(FetchDescriptor<SchemaV2.PlanDay>()) { context.delete(giorno) }
+        for scheda in try context.fetch(FetchDescriptor<SchemaV2.Routine>()) { context.delete(scheda) }
+        for esercizio in try context.fetch(FetchDescriptor<SchemaV2.Exercise>()) { context.delete(esercizio) }
         try context.save()
 
-        var esercizi: [UUID: SchemaV1.Exercise] = [:]
+        var esercizi: [UUID: SchemaV2.Exercise] = [:]
         for voce in exercises {
-            let esercizio = SchemaV1.Exercise(name: voce.name, muscleGroup: .chest, equipment: .other,
+            let esercizio = SchemaV2.Exercise(name: voce.name, muscleGroup: .chest, equipment: .other,
                                               builtInKey: voce.builtInKey, createdAt: voce.createdAt)
             esercizio.id = voce.id
             esercizio.muscleGroupRaw = voce.muscleGroup
@@ -74,9 +78,9 @@ extension BackupFile {
             esercizi[voce.id] = esercizio
         }
 
-        var schede: [UUID: SchemaV1.Routine] = [:]
+        var schede: [UUID: SchemaV2.Routine] = [:]
         for voce in routines {
-            let scheda = SchemaV1.Routine(name: voce.name, createdAt: voce.createdAt)
+            let scheda = SchemaV2.Routine(name: voce.name, createdAt: voce.createdAt)
             scheda.id = voce.id
             context.insert(scheda)
             schede[voce.id] = scheda
@@ -85,13 +89,16 @@ extension BackupFile {
                                          setCount: riga.setCount, repsMin: riga.repsMin, repsMax: riga.repsMax,
                                          approachCount: riga.approachCount, fixedRest: riga.fixedRest,
                                          setup: riga.setup, cues: riga.cues)
+                entry.measureRaw = riga.measure ?? SetMeasure.reps.rawValue
+                entry.targetSeconds = riga.targetSeconds ?? DurationLimits.standard
+                entry.withWeight = riga.withWeight ?? false
                 context.insert(entry)
                 entry.routine = scheda
             }
         }
 
         for voce in planDays {
-            context.insert(SchemaV1.PlanDay(weekday: voce.weekday, routine: voce.routineID.flatMap { schede[$0] }))
+            context.insert(SchemaV2.PlanDay(weekday: voce.weekday, routine: voce.routineID.flatMap { schede[$0] }))
         }
 
         for voce in sessions {
@@ -106,19 +113,22 @@ extension BackupFile {
             sessione.note = voce.note
             context.insert(sessione)
 
-            var perPosizione: [Int: SchemaV1.SessionExercise] = [:]
+            var perPosizione: [Int: SchemaV2.SessionExercise] = [:]
             for riga in voce.exercises {
-                let esercizio = SchemaV1.SessionExercise(
+                let esercizio = SchemaV2.SessionExercise(
                     position: riga.position, exercise: riga.exerciseID.flatMap { esercizi[$0] }, name: riga.name,
                     repsMin: riga.repsMin, repsMax: riga.repsMax, approachCount: riga.approachCount,
                     fixedRest: riga.fixedRest, setup: riga.setup, cues: riga.cues)
                 esercizio.note = riga.note
                 esercizio.isPostponed = riga.isPostponed
+                esercizio.measureRaw = riga.measure ?? SetMeasure.reps.rawValue
+                esercizio.targetSeconds = riga.targetSeconds ?? DurationLimits.standard
+                esercizio.withWeight = riga.withWeight ?? false
                 context.insert(esercizio)
                 esercizio.session = sessione
                 perPosizione[riga.position] = esercizio
                 for set in riga.sets {
-                    let registrato = SchemaV1.SessionSet(position: set.position, kind: .work,
+                    let registrato = SchemaV2.SessionSet(position: set.position, kind: .work,
                                                          targetWeight: set.targetWeight, targetReps: set.targetReps)
                     registrato.kindRaw = set.kind
                     registrato.weight = set.weight
@@ -126,13 +136,15 @@ extension BackupFile {
                     registrato.reserveRaw = set.reserve
                     registrato.startedAt = set.startedAt
                     registrato.endedAt = set.endedAt
+                    registrato.targetSeconds = set.targetSeconds
+                    registrato.seconds = set.seconds
                     context.insert(registrato)
                     registrato.sessionExercise = esercizio
                 }
             }
 
             for riga in voce.pauses {
-                let pausa = SchemaV1.SessionPause(kind: .rest,
+                let pausa = SchemaV2.SessionPause(kind: .rest,
                                                   sessionExercise: riga.exercisePosition.flatMap { perPosizione[$0] },
                                                   afterApproach: riga.afterApproach, start: riga.start, end: riga.end)
                 pausa.kindRaw = riga.kind

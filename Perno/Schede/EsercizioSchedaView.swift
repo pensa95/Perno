@@ -2,8 +2,9 @@ import SwiftUI
 import SwiftData
 import PernoCore
 
-/// J Esercizio nella scheda (foglio): set, ripetizioni da/a, avvicinamento, recupero,
-/// regolazioni, promemoria, «Togli dalla scheda», «Salva». La X chiude senza salvare.
+/// J Esercizio nella scheda (foglio): «Si misura in» Ripetizioni / Tempo (UI v5), set, ripetizioni
+/// da/a oppure durata e «Con peso», avvicinamento (solo a ripetizioni), recupero, regolazioni,
+/// promemoria, «Togli dalla scheda», «Salva». La X chiude senza salvare.
 struct EsercizioSchedaView: View {
     let entry: RoutineEntry
 
@@ -14,6 +15,9 @@ struct EsercizioSchedaView: View {
     @State private var repsMin: Int
     @State private var repsMax: Int
     @State private var approaches: Int
+    @State private var misura: SetMeasure
+    @State private var secondi: Int
+    @State private var conPeso: Bool
     @State private var fixedRest: Double?
     @State private var setup: String
     @State private var cues: [String]
@@ -27,6 +31,9 @@ struct EsercizioSchedaView: View {
         _repsMin = State(initialValue: entry.repsMin)
         _repsMax = State(initialValue: entry.repsMax)
         _approaches = State(initialValue: entry.approachCount)
+        _misura = State(initialValue: entry.measure)
+        _secondi = State(initialValue: entry.targetSeconds)
+        _conPeso = State(initialValue: entry.withWeight)
         _fixedRest = State(initialValue: entry.fixedRest)
         _setup = State(initialValue: entry.setup)
         _cues = State(initialValue: Cues.split(entry.cues))
@@ -51,8 +58,13 @@ struct EsercizioSchedaView: View {
     var body: some View {
         Foglio(titolo: esercizio?.name ?? "Esercizio", sottotitolo: sottotitolo, pulsante: "Salva",
                chiudi: { dismiss() }, conferma: salva) {
-            setDiLavoro
-            avvicinamento
+            siMisuraIn
+            if misura == .time {
+                setATempo
+            } else {
+                setDiLavoro
+                avvicinamento
+            }
             recupero
             regolazioni
             promemoria
@@ -67,6 +79,76 @@ struct EsercizioSchedaView: View {
     }
 
     // MARK: Sezioni
+
+    /// Prima voce del foglio (UI v5): l'esercizio si misura in ripetizioni o a tempo.
+    private var siMisuraIn: some View {
+        VStack(spacing: 12) {
+            EtichettaSezione("Si misura in")
+            SelettoreSegmenti(valori: SetMeasure.allCases, selezione: $misura) { $0.label }
+                .accessibilityLabel("Si misura in")
+        }
+    }
+
+    /// Set di lavoro a tempo: set, durata (passi di 5 s) e spunta «Con peso».
+    private var setATempo: some View {
+        VStack(spacing: 12) {
+            EtichettaSezione("Set di lavoro")
+            Pila {
+                HStack(spacing: 12) {
+                    Text("Set")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    StepperPiastra(valore: "\(sets)",
+                                   menoAttivo: sets > EntryLimits.sets.lowerBound,
+                                   piuAttivo: sets < EntryLimits.sets.upperBound,
+                                   etichettaMeno: "Un set in meno", etichettaPiu: "Un set in più",
+                                   meno: { sets -= 1 }, piu: { sets += 1 })
+                }
+                .vocePila()
+
+                HStack(spacing: 12) {
+                    Text("Durata")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    StepperPiastra(valore: Clock.text(Double(secondi)),
+                                   menoAttivo: secondi > DurationLimits.range.lowerBound,
+                                   piuAttivo: secondi < DurationLimits.range.upperBound,
+                                   etichettaMeno: "Cinque secondi in meno", etichettaPiu: "Cinque secondi in più",
+                                   meno: { secondi = DurationLimits.stepped(secondi, by: -1) },
+                                   piu: { secondi = DurationLimits.stepped(secondi, by: 1) })
+                }
+                .vocePila()
+
+                Button {
+                    conPeso.toggle()
+                } label: {
+                    HStack(spacing: 12) {
+                        SpuntaQuadrata(attiva: conPeso)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Con peso")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Color.inchiostro)
+                            Text(EntryHints.withWeight)
+                                .font(.footnote)
+                                .foregroundStyle(Color.inchiostroTenue)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .vocePila()
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Con peso")
+                .accessibilityValue(conPeso ? "Attivo" : "Non attivo")
+                .accessibilityHint(EntryHints.withWeight)
+                .accessibilityAddTraits(.isToggle)
+            }
+            aiuto(EntryHints.timedProgression(seconds: secondi))
+        }
+    }
 
     private var setDiLavoro: some View {
         VStack(spacing: 12) {
@@ -295,7 +377,11 @@ struct EsercizioSchedaView: View {
         entry.setCount = sets
         entry.repsMin = repsMin
         entry.repsMax = repsMax
-        entry.approachCount = approaches
+        // L'avvicinamento è in % del peso: c'è solo a ripetizioni.
+        entry.approachCount = misura == .time ? 0 : approaches
+        entry.measure = misura
+        entry.targetSeconds = secondi
+        entry.withWeight = conPeso
         entry.fixedRest = fixedRest
         entry.setup = setup.trimmingCharacters(in: .whitespacesAndNewlines)
         entry.cues = Cues.join(cues)
@@ -317,5 +403,26 @@ struct EsercizioSchedaView: View {
             }
             try? context.save()
         }
+    }
+}
+
+/// Spunta quadrata (v5, «Con peso»): piena in inchiostro con il segno di spunta, vuota con il bordo.
+private struct SpuntaQuadrata: View {
+    let attiva: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(attiva ? Color.inchiostro : Color.clear)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(attiva ? Color.clear : Color.inchiostroTenue, lineWidth: 2)
+            if attiva {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.foglio)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
     }
 }

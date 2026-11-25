@@ -2,21 +2,24 @@ import Foundation
 import SwiftData
 import PernoCore
 
-/// Migrazioni tra le versioni dello schema. Per ora c'è solo la v1.
+/// Migrazioni tra le versioni dello schema.
 enum PernoMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self]
+        [SchemaV1.self, SchemaV2.self]
     }
 
     static var stages: [MigrationStage] {
-        []
+        [v1ToV2]
     }
+
+    /// v1 → v2: solo campi nuovi con un valore predefinito (tutto a ripetizioni, come prima).
+    static let v1ToV2 = MigrationStage.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)
 }
 
 enum PernoStore {
     /// Archivio dell'app sul telefono, con la libreria esercizi caricata al primo avvio.
     static func makeContainer() throws -> ModelContainer {
-        let schema = Schema(versionedSchema: SchemaV1.self)
+        let schema = Schema(versionedSchema: SchemaV2.self)
         let configuration = ModelConfiguration(schema: schema)
         let container = try ModelContainer(for: schema, migrationPlan: PernoMigrationPlan.self,
                                            configurations: configuration)
