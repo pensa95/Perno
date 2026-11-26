@@ -48,6 +48,8 @@ final class SessioneInCorso: Identifiable {
     private var pauseScritte = 0
 
     let id: UUID
+    /// Fotografia della scheda all'avvio o all'ultimo allineamento (T12): si applica solo quello che cambia.
+    private var fotoScheda: [RoutineSync.EntrySnapshot] = []
 
     /// `riprendi`: sessione interrotta (app chiusa) che riparte dal set dopo l'ultimo «Set fatto»,
     /// con il recupero ricalcolato da adesso.
@@ -55,6 +57,7 @@ final class SessioneInCorso: Identifiable {
          alle ora: Date = .now, context: ModelContext) {
         self.sessione = sessione
         self.id = sessione.id
+        self.fotoScheda = sessione.routine?.orderedEntries.compactMap(\.fotografia) ?? []
         self.context = context
         let esercizi = sessione.orderedExercises
         self.esercizi = esercizi
@@ -570,12 +573,19 @@ final class SessioneInCorso: Identifiable {
     /// sull'esercizio mostrato. Se l'esercizio era già finito (dopo l'ultimo set o a fine sessione) si
     /// torna lì, dal set nuovo, con il cambio esercizio da adesso.
     func aggiungiSet(alle ora: Date = .now) {
-        guard let indice = indiceEsercizio,
-              let nuovo = try? macchina.addSet(toExercise: indice) else { return }
+        guard let indice = indiceEsercizio, aggiungiSetDiLavoro(indice) else { return }
         if indice != macchina.currentExerciseIndex || macchina.phase == .finished {
             ultimoFinito = nil
             try? macchina.complete(exercise: indice, at: ora)
         }
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// Un set di lavoro in più in fondo all'esercizio `indice`, uguale all'ultimo (anche a tempo).
+    @discardableResult
+    private func aggiungiSetDiLavoro(_ indice: Int) -> Bool {
+        guard let nuovo = try? macchina.addSet(toExercise: indice) else { return false }
         let piano = macchina.exercises[indice].sets[nuovo]
         let registrato = SessionSet(position: nuovo, kind: piano.kind,
                                     targetWeight: piano.weight, targetReps: piano.reps)
@@ -585,7 +595,95 @@ final class SessioneInCorso: Identifiable {
         context.insert(registrato)
         registrato.sessionExercise = esercizi[indice]
         set[indice].append(registrato)
-        sessione.lastActivityAt = ora
+        return true
+    }
+
+    // MARK: Modifiche alla scheda a sessione aperta (UI v6, T12)
+
+    /// Dopo ogni salvataggio: confronta la scheda con la fotografia presa all'avvio (o all'ultimo
+    /// allineamento) e applica solo quello che è cambiato nella scheda (`RoutineSync`). Le modifiche fatte in
+    /// sessione restano; i set fatti non si toccano mai.
+    func allineaAllaScheda(alle ora: Date = .now) {
+        guard let scheda = sessione.routine, sessione.endedAt == nil, !conclusa else { return }
+        let adesso = scheda.orderedEntries.compactMap(\.fotografia)
+        let modifiche = RoutineSync.changes(from: fotoScheda, to: adesso)
+        fotoScheda = adesso
+        guard !modifiche.isEmpty else { return }
+
+        // Voci cambiate: parametri copiati, set da fare adeguati.
+        for cambio in modifiche.changed {
+            guard let indice = esercizi.firstIndex(where: { $0.routineEntryID == cambio.after.id }) else { continue }
+            let esercizio = esercizi[indice]
+            let voce = cambio.after
+            esercizio.repsMin = voce.repsMin
+            esercizio.repsMax = voce.repsMax
+            esercizio.fixedRest = voce.fixedRest
+            esercizio.setup = voce.setup
+            esercizio.cues = voce.cues
+            esercizio.restModeRaw = voce.restMode
+            esercizio.autoStartAfterRest = voce.autoStartAfterRest
+            if cambio.repsChanged && !esercizio.isTimed {
+                for (posizione, registrato) in set[indice].enumerated()
+                where registrato.kind != .approach && !macchina.isDone(exercise: indice, set: posizione) {
+                    let nuove = RoutineSync.reps(registrato.targetReps, min: voce.repsMin, max: voce.repsMax)
+                    guard nuove != registrato.targetReps,
+                          (try? macchina.retargetSet(exercise: indice, set: posizione, weight: registrato.targetWeight,
+                                                     reps: nuove, kind: registrato.kind,
+                                                     step: PlateStep.current)) != nil else { continue }
+                    registrato.targetReps = nuove
+                }
+            }
+            if cambio.workSetDelta > 0 {
+                for _ in 0..<cambio.workSetDelta { aggiungiSetDiLavoro(indice) }
+            } else if cambio.workSetDelta < 0 {
+                for _ in 0..<(-cambio.workSetDelta) {
+                    guard let posizione = set[indice].indices.last(where: {
+                        set[indice][$0].kind != .approach && macchina.canDeleteUndoneSet(exercise: indice, set: $0)
+                    }) else { break }
+                    togliSet(esercizio: indice, set: posizione, alle: ora)
+                }
+            }
+        }
+
+        // Voci tolte: l'esercizio sparisce solo se non ha set fatti (i suoi set da fare si cancellano).
+        for id in modifiche.removed {
+            guard let indice = esercizi.firstIndex(where: { $0.routineEntryID == id }),
+                  (try? macchina.drop(exercise: indice, at: ora)) != nil else { continue }
+            for vecchio in set[indice] { context.delete(vecchio) }
+            set[indice] = []
+            esercizi[indice].position = macchina.order.count + indice
+        }
+
+        // Voci aggiunte: in fondo ai «Da fare», con «Aggiunto dalla scheda».
+        var piani: [PlannedExercise] = []
+        for voce in scheda.orderedEntries where voce.entryID.map(modifiche.added.contains) == true {
+            let registrato = SessionExercise(position: esercizi.count, entry: voce)
+            registrato.addedFromRoutine = true
+            context.insert(registrato)
+            registrato.session = sessione
+            let (piano, durata) = WorkoutSession.pianoDi(voce)
+            var nuovi: [SessionSet] = []
+            for (posizione, pianificato) in piano.enumerated() {
+                let nuovo = SessionSet(position: posizione, kind: pianificato.kind,
+                                       targetWeight: pianificato.weight, targetReps: pianificato.reps)
+                if voce.isTimed { nuovo.targetSeconds = durata }
+                context.insert(nuovo)
+                nuovo.sessionExercise = registrato
+                nuovi.append(nuovo)
+            }
+            esercizi.append(registrato)
+            set.append(nuovi)
+            prima.append(voce.exercise.map(WorkoutSession.ultimiSetDiLavoro) ?? [])
+            primaATempo.append(voce.isTimed ? (voce.exercise.map { WorkoutSession.ultimiSetATempo($0) } ?? []) : [])
+            piani.append(PlannedExercise(name: registrato.name, sets: piano))
+        }
+        if !piani.isEmpty {
+            macchina.appendExercises(piani, at: ora)
+            for (posizione, indice) in macchina.order.enumerated() {
+                esercizi[indice].position = posizione
+            }
+        }
+        aggiornaRecuperoAbituale()
         try? context.save()
     }
 

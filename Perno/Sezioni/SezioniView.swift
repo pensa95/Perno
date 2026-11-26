@@ -165,6 +165,10 @@ struct SezioniView: View {
             if fase == .active { chiudiInattive() }
         }
         .background { OsservatoreAttivitaLive(sessione: sessione) }
+        // Modifiche alla scheda (o al suo esercizio) salvate a sessione aperta: arrivano alla sessione (T12).
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave).receive(on: RunLoop.main)) { _ in
+            sessione?.allineaAllaScheda()
+        }
         .onOpenURL { indirizzo in
             // Tocco sulla Live Activity, «Scegli esercizi», «Vai al riepilogo»: si apre la sessione.
             if indirizzo == IndirizziPerno.sessione, sessione != nil { schermoSessione = true }

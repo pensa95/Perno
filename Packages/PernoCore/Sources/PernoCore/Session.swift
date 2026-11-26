@@ -731,3 +731,46 @@ extension SessionMachine {
         }
     }
 }
+
+// MARK: - Esercizio tolto dalla scheda (UI v6, T12)
+
+extension SessionMachine {
+    /// Un esercizio tolto dalla scheda sparisce dalla sessione solo se non ha set fatti e non è in corso
+    /// (3-2-1, set o recupero).
+    public func canDrop(exercise: Int) -> Bool {
+        guard exercises.indices.contains(exercise), order.contains(exercise),
+              !exercises[exercise].sets.indices.contains(where: { isDone(exercise: exercise, set: $0) }) else {
+            return false
+        }
+        if exercise == currentExerciseIndex {
+            switch phase {
+            case .changeover, .warmUp: return true
+            default: return false
+            }
+        }
+        return true
+    }
+
+    /// Toglie l'esercizio dall'ordine di oggi; se era quello di adesso, tocca al successivo con set da fare
+    /// (nel cambio esercizio che era già in corso). Senza altri esercizi la sessione è finita.
+    public mutating func drop(exercise: Int, at now: Date) throws {
+        guard canDrop(exercise: exercise), let slot = order.firstIndex(of: exercise) else {
+            throw SessionError.invalidTransition
+        }
+        let wasCurrent = exercise == currentExerciseIndex
+        order.remove(at: slot)
+        if slot < position {
+            position -= 1
+        } else if wasCurrent {
+            while position < order.count, firstUndoneSet(of: order[position]) == nil {
+                position += 1
+            }
+            if position < order.count, let first = firstUndoneSet(of: order[position]) {
+                setIndex = first
+            } else {
+                setIndex = 0
+                if !isOpenEnded, case .changeover = phase { phase = .finished }
+            }
+        }
+    }
+}
