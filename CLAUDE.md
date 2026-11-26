@@ -36,6 +36,8 @@ Nel progetto claude.ai «App palestra» (documenti `claude/…`):
 | Si misura in: Ripetizioni / Tempo | `SetMeasure` (`.reps` / `.time`) | Scelta nell'esercizio della scheda (UI v5) |
 | Durata (del set a tempo) | `targetSeconds` / `seconds` | Durata obiettivo e fatta di un set a tempo, in secondi; passi di 5 s |
 | Con peso | `withWeight` | Spunta degli esercizi a tempo; a ripetizioni il peso c'è sempre |
+| Com'è andato? Leggero / Giusto / Faticoso | `Feeling` (`feelingRaw` sul set) | Faccina dopo un set di lavoro (UI v6); sostituisce la riserva, che resta per i dati vecchi |
+| Recupero dell'esercizio | `restModeRaw` / `autoStartAfterRest` | Cronometro o alla rovescia e «Parti da solo», scelti nell'esercizio della scheda (UI v6) |
 
 ## Ciclo della sessione (non cambiarlo)
 
@@ -46,7 +48,7 @@ Riscaldamento (dock arancio) → Cambio esercizio (grafite) → «Inizia» → 3
 - `Packages/PernoCore/` — logica pura in Swift (solo Foundation, deve compilare anche su Linux), con test XCTest. Tutta la logica che si può testare va qui, non nelle view.
 - `Perno/` — app SwiftUI (iOS 17+).
 - `PernoWidget/` — estensione WidgetKit con la Live Activity della sessione (blocco schermo e Dynamic Island). `Shared/` è compilato nell'app e nell'estensione (attributi e pulsanti, `LiveActivityIntent`); i testi della card li prepara `LiveActivityText` in `PernoCore`.
-- `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `SchemaV2` attuale, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
+- `Perno/Data/` — modello SwiftData versionato (`SchemaV1`, `SchemaV2`, `SchemaV3` attuale dalla UI v6, `PernoMigrationPlan`). Enum salvati come valore grezzo, pesi sempre in chili, ordine con `position`. Per cambiare il modello si aggiunge una nuova versione dello schema con la sua migrazione, mai modifiche dirette a `SchemaV1`.
 - `project.yml` — progetto XcodeGen; il `.xcodeproj` non si committa, lo genera la CI.
 - `.github/workflows/build.yml` — test su Linux e macOS, build `.ipa` non firmata, release scaricabile dal telefono.
 

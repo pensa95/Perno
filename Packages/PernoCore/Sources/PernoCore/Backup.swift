@@ -73,10 +73,19 @@ public struct BackupFile: Codable, Equatable, Sendable {
         public var measure: String?
         public var targetSeconds: Int?
         public var withWeight: Bool?
+        /// UI v6 (SchemaV3); assenti nei backup precedenti: `id` della voce (legame con le sessioni),
+        /// recupero cronometro / alla rovescia e «Parti da solo a fine recupero».
+        public var id: UUID?
+        public var restMode: String?
+        public var autoStartAfterRest: Bool?
 
         public init(position: Int, exerciseID: UUID?, setCount: Int, repsMin: Int, repsMax: Int,
                     approachCount: Int, fixedRest: Double?, setup: String, cues: String,
-                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil) {
+                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil,
+                    id: UUID? = nil, restMode: String? = nil, autoStartAfterRest: Bool? = nil) {
+            self.id = id
+            self.restMode = restMode
+            self.autoStartAfterRest = autoStartAfterRest
             self.position = position
             self.exerciseID = exerciseID
             self.setCount = setCount
@@ -151,11 +160,23 @@ public struct BackupFile: Codable, Equatable, Sendable {
         public var measure: String?
         public var targetSeconds: Int?
         public var withWeight: Bool?
+        /// UI v6 (SchemaV3); assenti nei backup precedenti: voce della scheda da cui viene (`nil` = aggiunto
+        /// in sessione), «Aggiunto dalla scheda», recupero e «Parti da solo» di oggi.
+        public var routineEntryID: UUID?
+        public var addedFromRoutine: Bool?
+        public var restMode: String?
+        public var autoStartAfterRest: Bool?
 
         public init(position: Int, exerciseID: UUID?, name: String, repsMin: Int, repsMax: Int,
                     approachCount: Int, fixedRest: Double?, setup: String, cues: String, note: String,
                     isPostponed: Bool, sets: [SessionSet],
-                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil) {
+                    measure: String? = nil, targetSeconds: Int? = nil, withWeight: Bool? = nil,
+                    routineEntryID: UUID? = nil, addedFromRoutine: Bool? = nil, restMode: String? = nil,
+                    autoStartAfterRest: Bool? = nil) {
+            self.routineEntryID = routineEntryID
+            self.addedFromRoutine = addedFromRoutine
+            self.restMode = restMode
+            self.autoStartAfterRest = autoStartAfterRest
             self.position = position
             self.exerciseID = exerciseID
             self.name = name
@@ -187,10 +208,13 @@ public struct BackupFile: Codable, Equatable, Sendable {
         /// Set a tempo (v5): durata obiettivo e fatta, in secondi.
         public var targetSeconds: Int?
         public var seconds: Int?
+        /// «Com'è andato?» (UI v6, `Feeling`); assente nei backup precedenti.
+        public var feeling: String?
 
         public init(position: Int, kind: String, targetWeight: Double, targetReps: Int, weight: Double?,
                     reps: Int?, reserve: Int?, startedAt: Date?, endedAt: Date?,
-                    targetSeconds: Int? = nil, seconds: Int? = nil) {
+                    targetSeconds: Int? = nil, seconds: Int? = nil, feeling: String? = nil) {
+            self.feeling = feeling
             self.position = position
             self.kind = kind
             self.targetWeight = targetWeight
