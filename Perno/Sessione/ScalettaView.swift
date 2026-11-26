@@ -8,6 +8,12 @@ struct ScalettaView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var aggiungiAperto = false
+    /// Esercizio da fare di cui si aprono gli «Obiettivi di oggi».
+    @State private var obiettivi: IndiceEsercizio?
+
+    private struct IndiceEsercizio: Identifiable {
+        let id: Int
+    }
 
     var body: some View {
         let scaletta = sessione.scaletta
@@ -42,10 +48,8 @@ struct ScalettaView: View {
                         Text("Da fare")
                             .font(.footnote.weight(.semibold))
                         Spacer()
-                        if scaletta.upcoming.count > 1 {
-                            Text("Tieni premuto per spostare")
-                                .font(.footnote.weight(.medium))
-                        }
+                        Text("Tocca per gli obiettivi di oggi")
+                            .font(.footnote.weight(.medium))
                     }
                     .foregroundStyle(Color.inchiostroTenue)
                     .padding(.horizontal, 4)
@@ -89,6 +93,9 @@ struct ScalettaView: View {
         }
         .stileFoglio()
         .presentationDetents([.large])
+        .sheet(item: $obiettivi) { voce in
+            ObiettiviOggiView(sessione: sessione, esercizio: voce.id)
+        }
         .sheet(isPresented: $aggiungiAperto) {
             AggiungiEserciziView(sessione: sessione)
         }
@@ -150,27 +157,50 @@ struct ScalettaView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// Esercizio da fare (tavola 11, UI v6): maniglia, nome, obiettivi di oggi «3 × 40 × 10» e la matita.
+    /// Il tocco apre «Obiettivi di oggi»; tenendo premuto si sposta.
     private func daFare(_ indice: Int) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "equal")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.iconaTenue)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            Text(sessione.esercizi[indice].name)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(Color.inchiostro)
+        let testo = sessione.testoObiettivi(indice)
+        let modificabile = sessione.puoCambiareObiettivi(indice)
+        return Button {
+            obiettivi = IndiceEsercizio(id: indice)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "equal")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.iconaTenue)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sessione.esercizi[indice].name)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color.inchiostro)
+                    if let testo {
+                        Text(testo)
+                            .font(.piastra(20))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.inchiostroTenue)
+                    }
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(LineupText.sets(sessione.setDiLavoro(di: indice).totale))
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Color.inchiostroTenue)
+                if modificabile {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 8)
+            .frame(minHeight: 64)
+            .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .padding(.leading, 8)
-        .padding(.trailing, 12)
-        .padding(.vertical, 8)
-        .frame(minHeight: 60)
-        .background(Color.foglio, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .buttonStyle(.plain)
+        .disabled(!modificabile)
+        .accessibilityLabel(testo.map { "\(sessione.esercizi[indice].name), obiettivi di oggi \($0)" }
+                            ?? sessione.esercizi[indice].name)
     }
 
     private func rimandato(_ indice: Int) -> some View {

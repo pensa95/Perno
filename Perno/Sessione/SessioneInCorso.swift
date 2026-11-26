@@ -455,6 +455,50 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
+    // MARK: Obiettivi di oggi (UI v6)
+
+    /// Obiettivi di oggi dell'esercizio (set di lavoro, peso, ripetizioni) e, a tempo, la durata.
+    func obiettiviDiOggi(_ indice: Int) -> (obiettivi: TodayTargets, secondi: Int?)? {
+        guard let obiettivi = macchina.todayTargets(exercise: indice) else { return nil }
+        let secondi = aTempo(indice)
+            ? (set[indice].first { $0.kind != .approach }.map(obiettivoSecondi) ?? esercizi[indice].targetSeconds)
+            : nil
+        return (obiettivi, secondi)
+    }
+
+    /// In scaletta: «3 × 40 × 10» (a tempo «3 × 0:45»).
+    func testoObiettivi(_ indice: Int) -> String? {
+        guard let valori = obiettiviDiOggi(indice) else { return nil }
+        return valori.obiettivi.summary(seconds: valori.secondi,
+                                        withWeight: !aTempo(indice) || esercizi[indice].withWeight)
+    }
+
+    func puoCambiareObiettivi(_ indice: Int) -> Bool {
+        macchina.canSetTodayTargets(exercise: indice)
+    }
+
+    /// «Obiettivi di oggi» → «Salva» (tavola 11): valgono per tutti i set di oggi, solo per questa sessione.
+    /// I set dell'esercizio (nessuno è fatto) si rifanno dal piano nuovo.
+    func impostaObiettivi(_ indice: Int, _ obiettivi: TodayTargets, secondi: Int?, alle ora: Date = .now) {
+        do {
+            try macchina.setTodayTargets(exercise: indice, targets: obiettivi, step: PlateStep.current)
+        } catch {
+            return
+        }
+        for vecchio in set[indice] { context.delete(vecchio) }
+        let nuovi = macchina.exercises[indice].sets.enumerated().map { posizione, piano -> SessionSet in
+            let nuovo = SessionSet(position: posizione, kind: piano.kind,
+                                   targetWeight: piano.weight, targetReps: piano.reps)
+            if let secondi, piano.kind != .approach { nuovo.targetSeconds = secondi }
+            context.insert(nuovo)
+            nuovo.sessionExercise = esercizi[indice]
+            return nuovo
+        }
+        set[indice] = nuovi
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
     // MARK: Sostituisci (UI v6)
 
     /// «Sostituisci» si può usare sull'esercizio: ha set da fare e nessun suo set è in corso.
