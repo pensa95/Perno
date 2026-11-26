@@ -124,9 +124,7 @@ struct StoricoView: View {
             vuoto("Gli esercizi fatti compaiono qui.")
         } else {
             let gruppi = gruppiEsercizi(esercizi)
-            VStack(spacing: 0) {
-                campoRicerca
-                    .padding(.horizontal, 20)
+            Group {
                 if gruppi.isEmpty {
                     vuoto("Nessun esercizio trovato.")
                         .padding(.top, 12)
@@ -144,6 +142,10 @@ struct StoricoView: View {
                     .scrollIndicators(.hidden)
                     .scrollDismissesKeyboard(.immediately)
                 }
+            }
+            .barraFissa {
+                campoRicerca
+                    .padding(.horizontal, 20)
             }
         }
     }

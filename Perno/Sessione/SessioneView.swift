@@ -49,7 +49,7 @@ struct SessioneView: View {
                               elimina: elimina)
                     .transition(menoMovimento ? .opacity : .move(edge: .trailing))
             } else {
-                TrascinaPerRidurre(sessione: sessione, inCima: inCima, riduci: riduci) {
+                TrascinaPerRidurre(inCima: inCima, riduci: riduci) {
                     schermata
                 }
                 .transition(menoMovimento ? .opacity : .move(edge: .leading))
@@ -95,6 +95,7 @@ struct SessioneView: View {
                     .coordinateSpace(name: "paginaSessione")
                     .onPreferenceChange(CimaPagina.self) { cima in inCima = cima >= -1 }
                     .scrollBounceBehavior(.basedOnSize)
+                    .chiudiScorriSeScorre()
                     TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
                         dock(ora: contesto.date)
                     }
@@ -111,8 +112,7 @@ struct SessioneView: View {
                     }
                 }
         }
-        // Fondo caldo con le fiamme durante il set in corso (T15, in prova: rollback in `SfondoFiamme.swift`).
-        .background(SfondoSessione(setInCorso: inSetFase))
+        .background(Color.lamiera.ignoresSafeArea())
         .task(id: inizioContoAllaRovescia) {
             guard let dal = inizioContoAllaRovescia else { return }
             let fine = Countdown.end(since: dal)
@@ -453,12 +453,6 @@ struct SessioneView: View {
         default:
             EmptyView()
         }
-    }
-
-    /// Fase «set in corso» (per lo sfondo con le fiamme).
-    private var inSetFase: Bool {
-        if case .inSet = sessione.fase { return true }
-        return false
     }
 
     /// Recupero in corso: il set di adesso è «prossimo» (la piastrina del recupero è «adesso»).
@@ -1012,11 +1006,10 @@ private struct CimaPagina: PreferenceKey {
 }
 
 /// Trascina giù per ridurre (UI v6, tavola 14): con la pagina scorsa in cima, un trascinamento lungo verso il
-/// basso stacca la sessione (angoli arrotondati, maniglia, ombra) e lascia vedere dietro la card della sessione;
+/// basso stacca la sessione (angoli arrotondati, maniglia, ombra) e lascia vedere dietro la lamiera, senza la card;
 /// oltre la soglia compare «Lascia per ridurre» e lasciando la sessione si riduce, come con la freccia giù.
 /// Sotto la soglia torna al suo posto. Il gesto parte solo se è verso il basso e dalla cima della pagina.
 private struct TrascinaPerRidurre<Contenuto: View>: View {
-    let sessione: SessioneInCorso
     let inCima: Bool
     let riduci: () -> Void
     @ViewBuilder let contenuto: () -> Contenuto
@@ -1052,16 +1045,11 @@ private struct TrascinaPerRidurre<Contenuto: View>: View {
         .simultaneousGesture(trascinamento)
     }
 
-    /// Dietro la sessione staccata: la lamiera, la card della sessione nel colore della fase e, oltre la
-    /// soglia, «Lascia per ridurre».
+    /// Dietro la sessione staccata: la lamiera della Home, senza la card della sessione (che compare con una
+    /// dissolvenza dopo il rilascio, in `SezioniView`), e, oltre la soglia, «Lascia per ridurre».
     private var dietro: some View {
         ZStack(alignment: .top) {
             Color.lamiera.ignoresSafeArea()
-            TimelineView(.periodic(from: .now, by: 1)) { contesto in
-                card(ora: contesto.date)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
             if oltre {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.down")
@@ -1078,42 +1066,6 @@ private struct TrascinaPerRidurre<Contenuto: View>: View {
             }
         }
         .accessibilityHidden(true)
-    }
-
-    private func card(ora: Date) -> some View {
-        let (etichetta, fondo, chiaro) = fase
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(etichetta)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(chiaro ? Color.inchiostroTenue : Color.white.opacity(0.8))
-                Spacer()
-                Text(SessionText.clock(ora.timeIntervalSince(sessione.sessione.startedAt)))
-                    .font(.piastra(20))
-                    .monospacedDigit()
-            }
-            Spacer(minLength: 0)
-            Text(sessione.esercizioCorrente?.name ?? sessione.sessione.titolo)
-                .font(.piastra(34))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .foregroundStyle(chiaro ? Color.inchiostro : Color.white)
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 120, alignment: .leading)
-        .background(fondo, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    /// Etichetta e colore della fase, come il dock (`chiaro`: fondo foglio con il testo inchiostro).
-    private var fase: (String, Color, Bool) {
-        switch sessione.fase {
-        case .warmUp: return ("Riscaldamento", .riscaldamento, false)
-        case .changeover: return ("Cambio esercizio", .piastra, false)
-        case .countdown: return ("3-2-1", .piastra, false)
-        case .inSet: return ("Set in corso", .foglio, true)
-        case .rest: return ("Recupero", .recupero, false)
-        case .finished: return ("Tutti i set fatti", .piastra, false)
-        }
     }
 
     private var trascinamento: some Gesture {

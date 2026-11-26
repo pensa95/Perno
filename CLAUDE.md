@@ -4,22 +4,13 @@ App iOS nativa (Swift/SwiftUI) per registrare gli allenamenti in palestra. Offli
 
 ## Regole di progetto (valgono sempre)
 
-1. **Prima di ogni commit su GitHub, controlla che il budget basti per chiudere il lavoro.** Il progetto gira su un piano Claude Pro con limiti di sessione e settimanali. Prima di iniziare un pezzo di lavoro stima se c'è margine per finirlo, fare il commit e il push. Se non c'è, non cominciarlo: chiudi e pubblica quello che è già completo, e lascia scritto cosa resta.
-2. **Mai lavori a metà su `main`.** Ogni commit deve essere completo e coerente: compila, i test passano (per quanto verificabile), nessun file lasciato con TODO che rompe la build. Meglio commit piccoli e finiti che uno grande interrotto. Se una sessione si interrompe, il ramo principale deve restare in uno stato che builda.
-3. **Specifiche e tavole sono già decise: non ripianificare né cambiare la UI, implementa.** Se qualcosa manca o è ambiguo, chiedi; non inventare stili fuori dal Design System «Pacco pesi».
-4. **Niente «fatto» senza prova.** Prima di dire che un lavoro è finito, mostra l'esito dei test o della build (CI compresa).
-5. **Un obiettivo per sessione**, poi prova sul telefono. Degli errori di build riporta solo le righe rilevanti.
-6. Commit e messaggi in italiano, brevi, al presente («Aggiunge…», «Corregge…»).
-
-## Dove sono le specifiche
-
-Nel progetto claude.ai «App palestra» (documenti `claude/…`):
-- `funzionalita-v1.md` — cosa fa l'app (fonte per il codice).
-- `schermate-ui-v4.md` — tavole della UI v4, **fonte di verità**: canvas https://claude.ai/artifact/Rya7xFNT3KLuxohPYqGBUV e canvas della Live Activity https://claude.ai/artifact/WkBgjgJLNDqgeCn7muwaDd (regole in `live-activity-v1.md`). La UI v3 è superata.
-- `schermate-ui-v5.md` — **esercizi a tempo**, si aggiunge alla v4 (fonte di verità per tutto ciò che riguarda il tempo): canvas https://claude.ai/artifact/7Wo7CJi5yRyvcK6UVtjvQp.
-- `note-fix.md` — elenco delle fix chieste dall'utente, con lo stato.
-- `piano-sviluppo.md` — calendario a settimane e regole per il piano Pro.
-- `identity-v1.md` — nome Perno, marchio, icona.
+1. **Leggi solo `claude/lavori.md`** (documento del progetto claude.ai «App palestra»): backlog, decisioni, regole di lavoro e task. Gli altri documenti `claude/…` sono archivio, da aprire solo se serve; `claude/funzionalita-v1.md` descrive cosa fa l'app.
+2. **Pacchetti, non task singoli**: più voci in un ramo e una PR, ramo nuovo da `origin/main` aggiornato.
+3. **Prima di ogni commit controlla che il budget basti per chiudere** (piano Claude Pro con limiti di sessione e settimanali). Se non basta, non cominciare: pubblica ciò che è completo e lascia scritto cosa resta.
+4. **Mai lavori a metà su `main`**: ogni commit è completo e coerente, il ramo principale resta in uno stato che builda.
+5. **Specifiche e tavole sono già decise**: non ripianificare né cambiare la UI, implementa; se qualcosa è ambiguo chiedi. Niente stili fuori dal Design System «Pacco pesi».
+6. **Niente «fatto» senza prova**: CI verde. Non c'è compilatore Swift nelle sessioni, quindi logica testabile in `PernoCore` e diff riletto prima del push.
+7. Commit e messaggi in italiano, brevi, al presente («Aggiunge…», «Corregge…»). Resoconti di una riga.
 
 ## Glossario (stessi nomi nell'interfaccia e nel codice)
 

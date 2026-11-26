@@ -376,19 +376,42 @@ struct BarraAvanzamento: View {
 
 // MARK: - Togli set scorrendo
 
-/// Scorrendo a sinistra una piastra da fare compare «Rimuovi» (rosso, cestino), come nell'editor della
-/// scheda (UI v6, tavola 9): lasciando a metà resta aperto e il tocco su «Rimuovi» toglie il set; lo
-/// scorrimento completo lo toglie subito, senza conferma. Il gesto parte solo se è orizzontale, così la
-/// pagina continua a scorrere in verticale. Con `attivo` falso (piastre fatte, set in corso) non fa niente.
+/// Una sola piastra aperta alla volta: chi si apre lo dice qui, le altre si richiudono.
+final class ScorriAperte: ObservableObject {
+    static let shared = ScorriAperte()
+    @Published var aperta: UUID?
+    func chiudiTutte() { if aperta != nil { aperta = nil } }
+}
+
+extension View {
+    /// Richiude «Rimuovi» se la lista scorre in verticale (va messo sul contenitore che scorre).
+    func chiudiScorriSeScorre() -> some View {
+        simultaneousGesture(
+            DragGesture(minimumDistance: 8).onChanged { valore in
+                if abs(valore.translation.height) > abs(valore.translation.width) {
+                    ScorriAperte.shared.chiudiTutte()
+                }
+            }
+        )
+    }
+}
+
+/// Scorrendo a sinistra una piastra da fare compare «Rimuovi» (rosso, cestino): lo scorrimento si ferma quando
+/// il pulsante è visibile per intero (oltre, resistenza elastica) e il set si toglie solo toccando «Rimuovi»,
+/// senza conferma. Con «Rimuovi» aperto o durante lo scorrimento il tocco sulla piastra non apre il dettaglio:
+/// la richiude. Una sola aperta alla volta. Il gesto parte solo se è orizzontale, così la pagina continua a
+/// scorrere in verticale. Con `attivo` falso (piastre fatte, set in corso) non fa niente.
+/// (L'editor della scheda usa lo scorrimento nativo della lista, con lo stesso comportamento.)
 struct ScorriPerTogliere: ViewModifier {
     let attivo: Bool
     let togli: () -> Void
 
+    @StateObject private var aperte = ScorriAperte.shared
+    @State private var identita = UUID()
     @State private var spostamento: CGFloat = 0
     @State private var aperto = false
     @State private var orizzontale: Bool?
     private let larghezza: CGFloat = 104
-    private let completo: CGFloat = 220
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -414,14 +437,13 @@ struct ScorriPerTogliere: ViewModifier {
                     }
                     .opacity(spostamento < 0 ? 1 : 0)
                 content
-                    // Il fondo copre il rosso solo mentre si scorre (ferma, la piastra da fare resta trasparente,
-                    // anche sul fondo caldo del set in corso).
+                    // Il fondo copre il rosso solo mentre si scorre (ferma, la piastra da fare resta trasparente).
                     .background(Color.lamiera.opacity(spostamento < 0 ? 1 : 0),
                                 in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .shadow(color: Color.ombra.opacity(spostamento < 0 ? 0.12 : 0), radius: 6, x: 4, y: 0)
                     .overlay {
-                        // Aperto: un tocco sulla piastra la richiude (non apre Correggi set).
-                        if aperto {
+                        // Scorrendo o aperto: un tocco sulla piastra la richiude (non apre Correggi set).
+                        if aperto || spostamento < 0 {
                             Color.clear
                                 .contentShape(Rectangle())
                                 .onTapGesture { chiudi() }
@@ -431,6 +453,9 @@ struct ScorriPerTogliere: ViewModifier {
             }
             .simultaneousGesture(trascinamento)
             .accessibilityAction(named: "Rimuovi", rimuovi)
+            .onChange(of: aperte.aperta) { _, nuova in
+                if nuova != identita && (aperto || spostamento < 0) { chiudi() }
+            }
         } else {
             content
         }
@@ -441,19 +466,16 @@ struct ScorriPerTogliere: ViewModifier {
             .onChanged { valore in
                 if orizzontale == nil {
                     orizzontale = abs(valore.translation.width) > abs(valore.translation.height)
+                    if orizzontale == false { aperte.chiudiTutte() }
                 }
                 guard orizzontale == true else { return }
-                let base: CGFloat = aperto ? -larghezza : 0
-                spostamento = min(0, base + valore.translation.width)
+                if aperte.aperta != identita { aperte.aperta = identita }
+                spostamento = posizione(valore.translation.width)
             }
             .onEnded { valore in
                 defer { orizzontale = nil }
                 guard orizzontale == true else { return }
-                let base: CGFloat = aperto ? -larghezza : 0
-                let finale = base + valore.predictedEndTranslation.width
-                if finale < -completo {
-                    rimuovi()
-                } else if base + valore.translation.width < -larghezza / 2 {
+                if posizione(valore.translation.width) < -larghezza / 2 {
                     withAnimation(.snappy) {
                         spostamento = -larghezza
                         aperto = true
@@ -464,7 +486,16 @@ struct ScorriPerTogliere: ViewModifier {
             }
     }
 
+    /// Posizione della piastra: ferma a «Rimuovi» tutto visibile, oltre solo una resistenza elastica.
+    private func posizione(_ traslazione: CGFloat) -> CGFloat {
+        let grezza = min(0, (aperto ? -larghezza : 0) + traslazione)
+        guard grezza < -larghezza else { return grezza }
+        let oltre = -larghezza - grezza
+        return -larghezza - 24 * tanh(oltre / 60)
+    }
+
     private func chiudi() {
+        if aperte.aperta == identita { aperte.aperta = nil }
         withAnimation(.snappy) {
             spostamento = 0
             aperto = false
@@ -475,6 +506,7 @@ struct ScorriPerTogliere: ViewModifier {
         // La riga che prende il posto di quella tolta riparte chiusa.
         spostamento = 0
         aperto = false
+        if aperte.aperta == identita { aperte.aperta = nil }
         withAnimation(.snappy) { togli() }
     }
 }
