@@ -364,19 +364,58 @@ struct SessioneView: View {
 
             regolazioni(esercizio)
 
+            // Piastre dei set con i recuperi in mezzo (UI v6): i recuperi finiti come riga sottile con il tempo
+            // misurato, quello in corso come piastrina blu prima del set dopo (che dice «prossimo»).
+            let riposi = PlateText.measuredRests(exercise: indice, setCount: sessione.set[indice].count,
+                                                 completed: sessione.macchina.completedSets,
+                                                 pauses: sessione.macchina.pauses)
             VStack(spacing: 4) {
                 ForEach(Array(sessione.set[indice].enumerated()), id: \.offset) { posizione, set in
-                    Button {
-                        correzione = Correzione(esercizio: indice, set: posizione)
-                    } label: {
-                        piastra(set, posizione: posizione, esercizio: indice)
+                    Group {
+                        if posizione == sessione.macchina.setIndex {
+                            recuperoPrima(esercizio: esercizio)
+                        }
+                        Button {
+                            correzione = Correzione(esercizio: indice, set: posizione)
+                        } label: {
+                            piastra(set, posizione: posizione, esercizio: indice)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Correggi set")
+                        if let riposo = riposi[safe: posizione] ?? nil {
+                            RigaRecupero(testo: PlateText.restDone(riposo))
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Correggi set")
                 }
             }
             .padding(.top, 16)
         }
+    }
+
+    /// Prima del set di adesso: durante il recupero la piastrina blu con il tempo del dock; durante il 3-2-1
+    /// che parte dal recupero la riga del recupero appena finito (il tempo si registra alla fine del 3-2-1).
+    @ViewBuilder
+    private func recuperoPrima(esercizio: SessionExercise) -> some View {
+        switch sessione.fase {
+        case let .rest(dal):
+            TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
+                PiastrinaRecupero(
+                    tempo: RestTimer.display(mode: sessione.modoRecupero,
+                                             elapsed: contesto.date.timeIntervalSince(dal),
+                                             duration: sessione.durataRecupero),
+                    nota: PlateText.restNote(fixed: esercizio.fixedRest, usual: sessione.recuperoAbituale))
+            }
+        case let .countdown(dal, inizioPausa, tipo) where tipo == .rest:
+            RigaRecupero(testo: PlateText.restDone(dal.timeIntervalSince(inizioPausa)))
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Recupero in corso: il set di adesso è «prossimo» (la piastrina del recupero è «adesso»).
+    private var inRecupero: Bool {
+        if case .rest = sessione.fase { return true }
+        return false
     }
 
     /// Menu «…» dell'esercizio (tavola 12, UI v6): Aggiungi nota, Sostituisci (arriva con T10, finché non
@@ -491,13 +530,18 @@ struct SessioneView: View {
         // Avvicinamenti in tinta calda e senza percentuale (tavola 2, UI v6).
         let calda = set.kind == .approach
         if set.isDone, let peso = set.weight, let ripetizioni = set.reps {
+            // Fatta (UI v6): badge «+3» oltre l'obiettivo e faccina a destra (solo set di lavoro).
             return PiastraSet(nome: nome, valore: SessionText.weightReps(peso, ripetizioni),
-                              stato: .fatta(nota: calda ? nil : notaPrima), calda: calda)
+                              stato: .fatta(nota: nil), calda: calda,
+                              badge: calda ? nil : PlateText.overTarget(done: ripetizioni, target: set.targetReps),
+                              faccina: calda ? nil : set.feeling)
         }
 
         let obiettivo = SessionText.weightReps(set.targetWeight, set.targetReps)
-        guard posizione == sessione.macchina.setIndex else {
-            return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare, calda: calda)
+        guard posizione == sessione.macchina.setIndex, !inRecupero else {
+            let prossimo = posizione == sessione.macchina.setIndex
+            return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare, calda: calda,
+                              notaDaFare: prossimo ? PlateText.next : "obiettivo")
         }
 
         let inCorso: Bool = {
@@ -524,11 +568,14 @@ struct SessioneView: View {
             let fatti = set.seconds ?? obiettivo
             return PiastraSet(nome: nome,
                               valore: TimedText.value(seconds: fatti, weight: sessione.pesoATempo(indice, set.weight ?? set.targetWeight)),
-                              stato: .fatta(nota: TimedText.doneNote(seconds: fatti, target: obiettivo)))
+                              stato: .fatta(nota: TimedText.doneNote(seconds: fatti, target: obiettivo)),
+                              faccina: set.feeling)
         }
         let valore = TimedText.value(seconds: obiettivo, weight: sessione.pesoATempo(indice, set.targetWeight))
-        guard posizione == sessione.macchina.setIndex else {
-            return PiastraSet(nome: nome, valore: valore, stato: .daFare)
+        guard posizione == sessione.macchina.setIndex, !inRecupero else {
+            let prossimo = posizione == sessione.macchina.setIndex
+            return PiastraSet(nome: nome, valore: valore, stato: .daFare,
+                              notaDaFare: prossimo ? PlateText.next : "obiettivo")
         }
         let inCorso: Bool = {
             if case .inSet = sessione.fase { return true }
