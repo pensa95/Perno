@@ -381,6 +381,11 @@ final class ScorriAperte: ObservableObject {
     static let shared = ScorriAperte()
     @Published var aperta: UUID?
     func chiudiTutte() { if aperta != nil { aperta = nil } }
+
+    /// Finché è nel futuro, il tocco sotto la piastra non deve aprire il dettaglio: il gesto di scorrimento
+    /// e il tocco del pulsante sotto partono insieme, e al rilascio il pulsante scatterebbe lo stesso.
+    var tocchiBloccatiFinoA = Date.distantPast
+    var tocchiBloccati: Bool { Date() < tocchiBloccatiFinoA }
 }
 
 extension View {
@@ -469,12 +474,14 @@ struct ScorriPerTogliere: ViewModifier {
                     if orizzontale == false { aperte.chiudiTutte() }
                 }
                 guard orizzontale == true else { return }
+                aperte.tocchiBloccatiFinoA = .distantFuture
                 if aperte.aperta != identita { aperte.aperta = identita }
                 spostamento = posizione(valore.translation.width)
             }
             .onEnded { valore in
                 defer { orizzontale = nil }
                 guard orizzontale == true else { return }
+                aperte.tocchiBloccatiFinoA = Date().addingTimeInterval(0.4)
                 if posizione(valore.translation.width) < -larghezza / 2 {
                     withAnimation(.snappy) {
                         spostamento = -larghezza
