@@ -66,3 +66,24 @@ public enum RoutineLink {
         }
     }
 }
+
+/// Note dell'esercizio nella card bianca della sessione (UI v6, tavole 2 e 13).
+public enum ExerciseNoteText {
+    /// Etichetta sopra la nota di oggi.
+    public static let today = "Nota di oggi, la ritrovi la prossima volta"
+
+    /// «Nota della volta scorsa, 19 nov».
+    public static func lastTime(_ date: Date, calendar: Calendar = .current) -> String {
+        let day = calendar.component(.day, from: date)
+        let month = ItalianDate.months[max(0, min(11, calendar.component(.month, from: date) - 1))]
+        return "Nota della volta scorsa, \(day) \(month.prefix(3))"
+    }
+
+    /// La nota da mostrare dalla volta scorsa: quella dell'ultima volta che l'esercizio è stato fatto (la volta
+    /// più recente), solo se non è vuota. Le volte prima non contano.
+    public static func lastNote(_ times: [(date: Date, note: String)]) -> (date: Date, note: String)? {
+        guard let last = times.max(by: { $0.date < $1.date }) else { return nil }
+        let note = last.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return note.isEmpty ? nil : (last.date, note)
+    }
+}

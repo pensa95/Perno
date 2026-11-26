@@ -117,3 +117,16 @@ extension RoutineEntry {
         }
     }
 }
+
+extension SessionExercise {
+    /// Nota della volta scorsa (UI v6, T13): la nota dell'esercizio nell'ultima sessione chiusa in cui c'era,
+    /// esclusa questa; `nil` se quella volta non aveva una nota.
+    var notaVoltaScorsa: (date: Date, note: String)? {
+        guard let esercizio = exercise else { return nil }
+        let volte = esercizio.sessionExercises.compactMap { voce -> (date: Date, note: String)? in
+            guard let altra = voce.session, altra.endedAt != nil, altra.id != session?.id else { return nil }
+            return (altra.startedAt, voce.note)
+        }
+        return ExerciseNoteText.lastNote(volte)
+    }
+}
