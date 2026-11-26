@@ -16,8 +16,8 @@ final class SessioneInCorso: Identifiable {
     private(set) var prima: [[(weight: Double, reps: Int)]]
     /// Set a tempo dell'ultima volta, per «prima 10 × 0:40» e «+5 s» (UI v5).
     private(set) var primaATempo: [[TimedSet]]
-    /// Secondi del 3-2-1 (3, 5 o 10 dalle Impostazioni, «Prima di ogni set»).
-    let secondiContoAllaRovescia = Impostazioni.secondiContoAllaRovescia
+    /// Secondi del 3-2-1: sempre 3 (UI v6, vedi `Countdown`).
+    let secondiContoAllaRovescia = Countdown.seconds
 
     private(set) var macchina: SessionMachine
     /// Recupero abituale dell'esercizio corrente; aggiornato a ogni tocco.

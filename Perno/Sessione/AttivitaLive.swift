@@ -101,9 +101,8 @@ final class AttivitaLive {
     /// la stessa sequenza non si programma due volte e il set parte una volta sola.
     private func contoAllaRovescia(_ sessione: SessioneInCorso) async {
         guard case let .countdown(dal, _, _) = sessione.fase else { return }
-        let totale = sessione.secondiContoAllaRovescia
-        let fine = dal.addingTimeInterval(TimeInterval(totale))
-        Segnali.shared.sequenza(bip: Segnali.ultimiTre(prima: fine, durata: totale), via: fine)
+        let fine = Countdown.end(since: dal)
+        Segnali.shared.sequenza(bip: Countdown.beeps(since: dal), via: fine)
         await aspetta(fino: fine)
         guard case let .countdown(ancora, _, _) = sessione.fase, ancora == dal else {
             Segnali.shared.ferma(via: fine)

@@ -206,7 +206,8 @@ public enum LiveActivityText {
                         secondary: input.canPostpone ? LiveActivityButton(postpone, .postpone) : nil)
 
         case let .countdown(since, pauseStart, pauseKind):
-            let end = since.addingTimeInterval(TimeInterval(input.countdownSeconds))
+            // Stessa fine della schermata: tocco + anticipo + 3 s (vedi `Countdown`).
+            let end = Countdown.start(since: since).addingTimeInterval(TimeInterval(input.countdownSeconds))
             return make(pauseKind == .rest ? .rest : .changeover,
                         label: SessionText.countdownTitle(kind, input.setNumber),
                         title: exercise, setLabel: setName, setValue: value,
