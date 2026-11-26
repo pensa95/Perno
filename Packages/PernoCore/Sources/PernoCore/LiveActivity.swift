@@ -22,6 +22,8 @@ public enum LiveActivityAction: String, Codable, Hashable, Sendable, CaseIterabl
     case postpone
     case addFifteen
     case open
+    /// «Vai a Lat machine» dopo l'ultimo set di un esercizio (UI v6): porta al cambio esercizio.
+    case goToNext
 }
 
 public struct LiveActivityButton: Codable, Hashable, Sendable {
@@ -108,12 +110,19 @@ public struct LiveActivityInput: Sendable {
     public var targetSeconds: Int?
     /// Esercizio a tempo con «Con peso» (senza, il valore è solo «0:45»).
     public var withWeight: Bool
+    /// Fine dell'ultimo set di un esercizio (UI v6): si resta sull'esercizio finito, `exercise` è il
+    /// prossimo e la card propone «Vai a …». `nextDetail` è «3 set da 8 a 12».
+    public var awaitingNext: Bool
+    public var nextDetail: String?
 
     public init(phase: SessionPhase, routine: String, exercise: String?, exerciseWorkSets: Int,
                 setKind: SetKind?, setNumber: Int, weight: Double?, reps: Int?, restMode: RestMode,
                 restDuration: TimeInterval, restLabel: String, countdownSeconds: Int, canPostpone: Bool,
                 awaitingChoice: Bool, sessionStart: Date, workSetsDone: Int, workSetsTotal: Int,
-                targetSeconds: Int? = nil, withWeight: Bool = true) {
+                targetSeconds: Int? = nil, withWeight: Bool = true, awaitingNext: Bool = false,
+                nextDetail: String? = nil) {
+        self.awaitingNext = awaitingNext
+        self.nextDetail = nextDetail
         self.phase = phase
         self.routine = routine
         self.exercise = exercise
@@ -194,6 +203,13 @@ public enum LiveActivityText {
                         primary: LiveActivityButton(warmUpDone, .endWarmUp),
                         secondary: LiveActivityButton(skip, .skipWarmUp))
 
+        case let .changeover(since) where input.awaitingNext && input.exercise != nil:
+            // Fine dell'ultimo set di un esercizio: niente «Inizia», si va al cambio con «Vai a …».
+            let next = input.exercise ?? ""
+            return make(.changeover, label: changeover, title: NextExerciseText.then(next),
+                        setLabel: input.nextDetail ?? "", setValue: nil, start: since,
+                        primary: LiveActivityButton(NextExerciseText.goTo(next), .goToNext))
+
         case let .changeover(since):
             if input.awaitingChoice || input.exercise == nil {
                 return make(.changeover, label: changeover, title: noExercise, setLabel: freeSession,
@@ -254,4 +270,26 @@ public enum LiveActivityText {
         let end = since.addingTimeInterval(input.restDuration)
         return end > now ? end : nil
     }
+}
+
+/// Fine dell'ultimo set di un esercizio (UI v6, tavola 6): dock grafite «Cambio esercizio» con
+/// «Poi Lat machine, 3 set da 8 a 12» e il pulsante «Vai a Lat machine».
+public enum NextExerciseText {
+    /// «3 set da 8 a 12» (stesso intervallo: «3 set da 10»); a tempo «3 set da 0:45».
+    public static func detail(sets: Int, repsMin: Int, repsMax: Int, seconds: Int? = nil) -> String {
+        if let seconds { return "\(sets) set da \(Clock.text(Double(seconds)))" }
+        let reps = repsMin == repsMax ? "\(repsMin)" : "\(repsMin) a \(repsMax)"
+        return "\(sets) set da \(reps)"
+    }
+
+    /// «Poi Lat machine».
+    public static func then(_ exercise: String) -> String { "Poi \(exercise)" }
+
+    /// Riga sotto il tempo del dock: «Poi Lat machine, 3 set da 8 a 12».
+    public static func subtitle(exercise: String, detail: String) -> String {
+        detail.isEmpty ? then(exercise) : "\(then(exercise)), \(detail)"
+    }
+
+    /// «Vai a Lat machine».
+    public static func goTo(_ exercise: String) -> String { "Vai a \(exercise)" }
 }

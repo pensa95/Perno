@@ -241,6 +241,8 @@ struct DockSessione: View {
     /// Set a tempo (UI v5): «di 0:45» a destra del tempo e barra di avanzamento (0…1) sotto.
     var notaTempo: String? = nil
     var avanzamento: Double? = nil
+    /// Riga sotto il tempo (UI v6, tavola 6): «Poi Lat machine, 3 set da 8 a 12».
+    var sottotitolo: String? = nil
 
     /// Pulsante principale: 19 e 15 pt come nelle tavole, che crescono con «Testo più grande».
     @ScaledMetric(relativeTo: .title3) private var dimensioneTitolo: CGFloat = 19
@@ -278,6 +280,14 @@ struct DockSessione: View {
                         .accessibilityHint("Passa tra cronometro e conto alla rovescia")
                     } else {
                         testoTempo
+                    }
+                    if let sottotitolo {
+                        Text(sottotitolo)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(coloreEtichetta)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.top, 6)
                     }
                 }
                 Spacer(minLength: 0)

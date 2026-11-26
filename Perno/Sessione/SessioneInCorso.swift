@@ -108,7 +108,23 @@ final class SessioneInCorso: Identifiable {
     /// Esercizio sullo schermo: quello corrente; a sessione finita, quello dell'ultimo avviso o
     /// dell'ultimo set fatto («Continua» dal riepilogo dopo l'ultimo set).
     var indiceEsercizio: Int? {
-        macchina.currentExerciseIndex ?? avviso?.esercizio ?? macchina.completedSets.last?.exerciseIndex
+        esercizioFinito ?? macchina.currentExerciseIndex ?? avviso?.esercizio ?? macchina.completedSets.last?.exerciseIndex
+    }
+
+    /// Esercizio appena finito (UI v6, tavola 6): dopo l'ultimo set non si passa da soli al successivo,
+    /// si resta qui con il dock «Cambio esercizio» e «Vai a …». Il tempo del cambio parte comunque
+    /// dall'ultimo «Set fatto» (è la fase `changeover` della macchina). Vale solo finché la macchina è
+    /// ancora nel cambio verso un altro esercizio.
+    var esercizioFinito: Int? {
+        guard let finito = ultimoFinito, case .changeover = macchina.phase,
+              let prossimo = macchina.currentExerciseIndex, prossimo != finito else { return nil }
+        return finito
+    }
+    private var ultimoFinito: Int?
+
+    /// «Vai a Lat machine»: si apre il cambio esercizio del successivo.
+    func vaiAlProssimo() {
+        ultimoFinito = nil
     }
 
     var esercizioCorrente: SessionExercise? {
@@ -124,7 +140,12 @@ final class SessioneInCorso: Identifiable {
     }
 
     /// Posizione dell'esercizio corrente nell'ordine di oggi (1…).
-    var numeroEsercizio: Int { min(macchina.position + 1, macchina.order.count) }
+    var numeroEsercizio: Int {
+        if let finito = esercizioFinito, let posizione = macchina.order.firstIndex(of: finito) {
+            return posizione + 1
+        }
+        return min(macchina.position + 1, macchina.order.count)
+    }
 
     /// Numero del set corrente dentro il suo tipo («Avv. 2», «Set 1»).
     var numeroSetCorrente: Int {
@@ -160,6 +181,8 @@ final class SessioneInCorso: Identifiable {
         let fattiPrima = macchina.completedSets.count
         esegui(ora) { try $0.setDone(at: ora) }
         if let fatto = macchina.completedSets.last, macchina.completedSets.count > fattiPrima {
+            // Ultimo set di un esercizio con un altro dopo: si resta sull'esercizio finito (UI v6).
+            ultimoFinito = macchina.currentExerciseIndex != fatto.exerciseIndex ? fatto.exerciseIndex : nil
             if esercizi[fatto.exerciseIndex].isTimed {
                 // A tempo: si salva il tempo fatto, mai oltre l'obiettivo (a zero si chiude da solo).
                 let registrato = set[fatto.exerciseIndex][fatto.setIndex]

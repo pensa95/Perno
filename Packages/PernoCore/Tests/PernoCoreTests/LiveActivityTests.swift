@@ -126,3 +126,33 @@ final class LiveActivityTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(LiveActivityState.self, from: data), state)
     }
 }
+
+final class NextExerciseTests: XCTestCase {
+    func testTexts() {
+        XCTAssertEqual(NextExerciseText.detail(sets: 3, repsMin: 8, repsMax: 12), "3 set da 8 a 12")
+        XCTAssertEqual(NextExerciseText.detail(sets: 4, repsMin: 10, repsMax: 10), "4 set da 10")
+        XCTAssertEqual(NextExerciseText.detail(sets: 3, repsMin: 8, repsMax: 12, seconds: 45), "3 set da 0:45")
+        XCTAssertEqual(NextExerciseText.subtitle(exercise: "Lat machine", detail: "3 set da 8 a 12"),
+                       "Poi Lat machine, 3 set da 8 a 12")
+        XCTAssertEqual(NextExerciseText.goTo("Lat machine"), "Vai a Lat machine")
+    }
+
+    func testCardOffersGoToNext() {
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        let input = LiveActivityInput(phase: .changeover(since: t0), routine: "Upper body", exercise: "Lat machine",
+                                      exerciseWorkSets: 3, setKind: .approach, setNumber: 1, weight: 30, reps: 10,
+                                      restMode: .stopwatch, restDuration: 120, restLabel: "Recupero",
+                                      countdownSeconds: 3, canPostpone: true, awaitingChoice: false,
+                                      sessionStart: t0, workSetsDone: 3, workSetsTotal: 12,
+                                      awaitingNext: true, nextDetail: "3 set da 8 a 12")
+        let state = LiveActivityText.state(for: input, now: t0)
+        XCTAssertEqual(state.tone, .changeover)
+        XCTAssertEqual(state.label, "Cambio esercizio")
+        XCTAssertEqual(state.title, "Poi Lat machine")
+        XCTAssertEqual(state.setLabel, "3 set da 8 a 12")
+        XCTAssertNil(state.setValue)
+        XCTAssertEqual(state.timerStart, t0)
+        XCTAssertEqual(state.primary, LiveActivityButton("Vai a Lat machine", .goToNext))
+        XCTAssertNil(state.secondary)
+    }
+}
