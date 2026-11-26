@@ -120,8 +120,9 @@ struct SessioneView: View {
             await segnaliFinoA(fine, durata: totale)
         }
         .task(id: fineRecuperoConBip) {
-            // Ultimi 3 secondi del recupero alla rovescia: bip e vibrazione come nel 3-2-1, con l'app
-            // in primo piano (a schermo bloccato c'è la notifica «Recupero finito»).
+            // Ultimi 3 secondi del recupero alla rovescia: bip e vibrazione come nel 3-2-1. Con l'audio
+            // tenuto acceso per tutta la sessione (T1) i bip suonano anche a schermo bloccato, oltre
+            // alla notifica «Recupero finito»; la vibrazione si sente solo con l'app in primo piano.
             guard let fine = fineRecuperoConBip else { return }
             let anticipo = fine.timeIntervalSinceNow - 3.5
             if anticipo > 0 {
