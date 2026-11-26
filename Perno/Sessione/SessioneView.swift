@@ -395,6 +395,8 @@ struct SessioneView: View {
                             recuperoPrima(esercizio: esercizio)
                         }
                         Button {
+                            // Dopo uno scorrimento laterale il tocco non apre il dettaglio.
+                            guard !ScorriAperte.shared.tocchiBloccati else { return }
                             correzione = Correzione(esercizio: indice, set: posizione)
                         } label: {
                             piastra(set, posizione: posizione, esercizio: indice)
