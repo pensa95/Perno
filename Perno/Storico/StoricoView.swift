@@ -124,25 +124,28 @@ struct StoricoView: View {
             vuoto("Gli esercizi fatti compaiono qui.")
         } else {
             let gruppi = gruppiEsercizi(esercizi)
-            Group {
+            // Una sola ScrollView anche senza risultati: il campo di ricerca non si ricrea (la tastiera resta).
+            ScrollView {
                 if gruppi.isEmpty {
-                    vuoto("Nessun esercizio trovato.")
-                        .padding(.top, 12)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(gruppi, id: \.title) { gruppo in
-                                gruppoEsercizi(gruppo)
-                            }
-                        }
+                    Text("Nessun esercizio trovato.")
+                        .font(.body)
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
-                        .padding(.bottom, 24)
+                } else {
+                    LazyVStack(spacing: 16) {
+                        ForEach(gruppi, id: \.title) { gruppo in
+                            gruppoEsercizi(gruppo)
+                        }
                     }
-                    .scrollIndicators(.hidden)
-                    .scrollDismissesKeyboard(.immediately)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 24)
                 }
             }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.immediately)
             .barraFissa {
                 campoRicerca
                     .padding(.horizontal, 20)

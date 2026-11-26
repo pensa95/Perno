@@ -626,49 +626,44 @@ extension Path {
 
 // MARK: - Barra fissa con sfumatura
 
-/// Barra (ricerca, testata) fissa sopra una lista: i contenuti che scorrono sotto la barra sfumano
-/// gradualmente e, con la lista in cima, non c'è nessuna sfumatura. Da iOS 26 è l'effetto nativo
-/// (`safeAreaBar` + `scrollEdgeEffectStyle`); da iOS 18 una sfumatura manuale che compare con lo
-/// scostamento; su iOS 17 la barra è fissa senza sfumatura. `fondo` è il colore dietro la lista.
+/// Barra (ricerca, testata) fissa sopra una lista. La barra ha il fondo pieno, quindi i contenuti non si vedono
+/// sotto; appena la lista scorre, sotto il suo bordo compare una sfumatura dal colore del fondo al trasparente,
+/// così i contenuti spariscono gradualmente. Con la lista in cima nessuna sfumatura. Da iOS 18 (su iOS 17 la
+/// barra resta piena, senza sfumatura). `fondo` è il colore dietro la lista. Va messo sulla `ScrollView`.
+/// (L'effetto nativo di iOS 26 lasciava vedere i contenuti sotto la barra: non si usa.)
 struct BarraFissaSfumata<Barra: View>: ViewModifier {
     let fondo: Color
     @ViewBuilder let barra: () -> Barra
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content
-                .safeAreaBar(edge: .top, spacing: 0) { barra() }
-                .scrollEdgeEffectStyle(.soft, for: .top)
-        } else if #available(iOS 18, *) {
-            SfumaturaManuale(fondo: fondo, barra: barra) { content }
-        } else {
-            content.safeAreaInset(edge: .top, spacing: 0) { barra() }
-        }
-    }
-}
-
-@available(iOS 18, *)
-private struct SfumaturaManuale<Barra: View, Contenuto: View>: View {
-    let fondo: Color
-    let barra: () -> Barra
-    @ViewBuilder let contenuto: () -> Contenuto
     @State private var scostamento: CGFloat = 0
 
-    var body: some View {
-        contenuto()
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y + geo.contentInsets.top
-            } action: { _, nuovo in
-                scostamento = nuovo
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    geo.contentOffset.y + geo.contentInsets.top
+                } action: { _, nuovo in
+                    scostamento = nuovo
+                }
+                .safeAreaInset(edge: .top, spacing: 0) { barraConFondo(sfumatura: true) }
+        } else {
+            content.safeAreaInset(edge: .top, spacing: 0) { barraConFondo(sfumatura: false) }
+        }
+    }
+
+    private func barraConFondo(sfumatura: Bool) -> some View {
+        barra()
+            .frame(maxWidth: .infinity)
+            .background(fondo)
+            .overlay(alignment: .bottom) {
+                if sfumatura {
+                    LinearGradient(colors: [fondo, fondo.opacity(0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 24)
+                        .offset(y: 24)
+                        .opacity(min(1, max(0, scostamento / 24)))
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
-            .overlay(alignment: .top) {
-                LinearGradient(colors: [fondo, fondo.opacity(0)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 20)
-                    .opacity(min(1, max(0, scostamento / 20)))
-                    .allowsHitTesting(false)
-            }
-            .safeAreaInset(edge: .top, spacing: 0) { barra() }
     }
 }
 
