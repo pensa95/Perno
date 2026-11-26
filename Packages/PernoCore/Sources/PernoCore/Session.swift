@@ -571,6 +571,53 @@ extension SessionMachine {
         }
     }
 
+    /// «Sostituisci» si può usare su questo esercizio: ha set da fare e non c'è un suo set in corso.
+    public func canReplace(exercise: Int) -> Bool {
+        guard exercises.indices.contains(exercise), firstUndoneSet(of: exercise) != nil else { return false }
+        if exercise == currentExerciseIndex {
+            switch phase {
+            case .countdown, .inSet, .finished: return false
+            default: break
+            }
+        }
+        return true
+    }
+
+    /// «Sostituisci» (UI v6, tavola 12), solo per oggi: i set fatti restano sull'esercizio vecchio, quelli da
+    /// fare spariscono; `planned` (gli stessi set, con gli obiettivi dell'esercizio nuovo) entra subito dopo
+    /// il vecchio nell'ordine di oggi (se il vecchio non ha set fatti esce dall'ordine). Se il vecchio era quello di adesso, il nuovo diventa quello di adesso,
+    /// nel cambio esercizio (dal recupero in corso, il tempo del cambio parte dall'ultimo «Set fatto»).
+    /// Restituisce l'indice dell'esercizio nuovo.
+    @discardableResult
+    public mutating func replaceExercise(_ old: Int, with planned: PlannedExercise, at now: Date) throws -> Int {
+        guard canReplace(exercise: old), !planned.sets.isEmpty else { throw SessionError.invalidTransition }
+        let wasCurrent = old == currentExerciseIndex
+        let kept = exercises[old].sets.indices.filter { isDone(exercise: old, set: $0) }
+        var newIndexOf: [Int: Int] = [:]
+        for (new, previous) in kept.enumerated() { newIndexOf[previous] = new }
+        exercises[old].sets = kept.map { exercises[old].sets[$0] }
+        for index in completedSets.indices where completedSets[index].exerciseIndex == old {
+            completedSets[index].setIndex = newIndexOf[completedSets[index].setIndex] ?? completedSets[index].setIndex
+        }
+        exercises.append(planned)
+        let added = exercises.count - 1
+        let slot = order.firstIndex(of: old).map { $0 + 1 } ?? order.count
+        order.insert(added, at: slot)
+        if wasCurrent {
+            position = slot
+            setIndex = 0
+            if case let .rest(since) = phase { phase = .changeover(since: since) }
+        } else if slot <= position {
+            position += 1
+        }
+        // Sostituito prima di fare set: il vecchio resta vuoto e sparisce dall'ordine di oggi.
+        if kept.isEmpty, let previous = order.firstIndex(of: old) {
+            order.remove(at: previous)
+            if previous < position { position -= 1 }
+        }
+        return added
+    }
+
     @discardableResult
     public mutating func addSet(toExercise exercise: Int) throws -> Int {
         guard exercises.indices.contains(exercise) else { throw SessionError.invalidTransition }

@@ -26,6 +26,7 @@ struct SessioneView: View {
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
+    @State private var sostituisciAperto = false
     @State private var scriviNota = false
     @State private var testoNota = ""
 
@@ -172,6 +173,11 @@ struct SessioneView: View {
         }
         .sheet(isPresented: $aggiungiAperto) {
             AggiungiEserciziView(sessione: sessione)
+        }
+        .sheet(isPresented: $sostituisciAperto) {
+            if let indice = sessione.indiceEsercizio {
+                SostituisciEsercizioView(sessione: sessione, esercizio: indice)
+            }
         }
         .sheet(isPresented: $scalettaAperta) {
             ScalettaView(sessione: sessione)
@@ -443,8 +449,8 @@ struct SessioneView: View {
         return false
     }
 
-    /// Menu «…» dell'esercizio (tavola 12, UI v6): Aggiungi nota, Sostituisci (arriva con T10, finché non
-    /// c'è resta nascosto), Progressi, Rimanda. «Aggiungi set» non è più qui (pulsante sotto i set, T9).
+    /// Menu «…» dell'esercizio (tavola 12, UI v6): Aggiungi nota, Sostituisci (solo se l'esercizio ha set da
+    /// fare e nessuno è in corso), Progressi, Rimanda. «Aggiungi set» è il pulsante sotto i set (T9).
     private func menuEsercizio(_ esercizio: SessionExercise) -> some View {
         Menu {
             Button {
@@ -454,6 +460,15 @@ struct SessioneView: View {
                 Text(esercizio.note.isEmpty ? "Aggiungi nota" : "Modifica nota")
                 Text("La ritrovi la prossima volta")
                 Image(systemName: "text.bubble")
+            }
+            if let indice = sessione.indiceEsercizio, sessione.puoSostituire(indice) {
+                Button {
+                    sostituisciAperto = true
+                } label: {
+                    Text("Sostituisci \(esercizio.name)")
+                    Text("Tutto l'esercizio, solo per oggi")
+                    Image(systemName: "arrow.left.arrow.right")
+                }
             }
             Button {
                 progressi = esercizio.exercise
