@@ -529,6 +529,48 @@ extension SessionMachine {
 extension SessionMachine {
     /// «+ set»: un set di lavoro in più in fondo all'esercizio, con l'obiettivo dell'ultimo set di
     /// lavoro (o, senza set di lavoro, dell'ultimo set). Restituisce l'indice del set nuovo.
+    /// Set da fare che si può togliere scorrendo la piastra (UI v6, tavola 9): non fatto, non quello in corso
+    /// (3-2-1 o set in corso), e l'esercizio deve tenere almeno un set.
+    public func canDeleteUndoneSet(exercise: Int, set: Int) -> Bool {
+        guard exercises.indices.contains(exercise), exercises[exercise].sets.indices.contains(set),
+              exercises[exercise].sets.count > 1, !isDone(exercise: exercise, set: set) else { return false }
+        if exercise == currentExerciseIndex, set == setIndex {
+            switch phase {
+            case .countdown, .inSet: return false
+            default: break
+            }
+        }
+        return true
+    }
+
+    /// «Rimuovi» su una piastra da fare: il set sparisce dall'esercizio, gli indici dei set dopo scalano.
+    /// Se era il prossimo set dell'esercizio di adesso tocca al set dopo; se non ce ne sono più, si passa al
+    /// cambio esercizio del successivo (il tempo del cambio parte dalla fine del recupero in corso, cioè
+    /// dall'ultimo «Set fatto»).
+    public mutating func deleteUndoneSet(exercise: Int, set: Int, at now: Date) throws {
+        guard canDeleteUndoneSet(exercise: exercise, set: set) else { throw SessionError.invalidTransition }
+        exercises[exercise].sets.remove(at: set)
+        for index in completedSets.indices
+        where completedSets[index].exerciseIndex == exercise && completedSets[index].setIndex > set {
+            completedSets[index].setIndex -= 1
+        }
+        guard exercise == currentExerciseIndex else { return }
+        if setIndex > set {
+            setIndex -= 1
+        } else if setIndex == set {
+            if let next = firstUndoneSet(of: exercise, after: set - 1) {
+                setIndex = next
+            } else {
+                switch phase {
+                case let .rest(since), let .changeover(since):
+                    moveToNextExercise(at: since)
+                default:
+                    moveToNextExercise(at: now)
+                }
+            }
+        }
+    }
+
     @discardableResult
     public mutating func addSet(toExercise exercise: Int) throws -> Int {
         guard exercises.indices.contains(exercise) else { throw SessionError.invalidTransition }

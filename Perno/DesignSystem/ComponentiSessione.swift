@@ -373,3 +373,105 @@ struct BarraAvanzamento: View {
         .accessibilityHidden(true)
     }
 }
+
+// MARK: - Togli set scorrendo
+
+/// Scorrendo a sinistra una piastra da fare compare «Rimuovi» (rosso, cestino), come nell'editor della
+/// scheda (UI v6, tavola 9): lasciando a metà resta aperto e il tocco su «Rimuovi» toglie il set; lo
+/// scorrimento completo lo toglie subito, senza conferma. Il gesto parte solo se è orizzontale, così la
+/// pagina continua a scorrere in verticale. Con `attivo` falso (piastre fatte, set in corso) non fa niente.
+struct ScorriPerTogliere: ViewModifier {
+    let attivo: Bool
+    let togli: () -> Void
+
+    @State private var spostamento: CGFloat = 0
+    @State private var aperto = false
+    @State private var orizzontale: Bool?
+    private let larghezza: CGFloat = 104
+    private let completo: CGFloat = 220
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if attivo {
+            ZStack(alignment: .trailing) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.errore)
+                    .overlay(alignment: .trailing) {
+                        Button(action: rimuovi) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Rimuovi")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .frame(width: 100)
+                            .frame(maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHidden(true)
+                    }
+                    .opacity(spostamento < 0 ? 1 : 0)
+                content
+                    .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .shadow(color: Color.ombra.opacity(spostamento < 0 ? 0.12 : 0), radius: 6, x: 4, y: 0)
+                    .overlay {
+                        // Aperto: un tocco sulla piastra la richiude (non apre Correggi set).
+                        if aperto {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture { chiudi() }
+                        }
+                    }
+                    .offset(x: spostamento)
+            }
+            .simultaneousGesture(trascinamento)
+            .accessibilityAction(named: "Rimuovi", rimuovi)
+        } else {
+            content
+        }
+    }
+
+    private var trascinamento: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { valore in
+                if orizzontale == nil {
+                    orizzontale = abs(valore.translation.width) > abs(valore.translation.height)
+                }
+                guard orizzontale == true else { return }
+                let base: CGFloat = aperto ? -larghezza : 0
+                spostamento = min(0, base + valore.translation.width)
+            }
+            .onEnded { valore in
+                defer { orizzontale = nil }
+                guard orizzontale == true else { return }
+                let base: CGFloat = aperto ? -larghezza : 0
+                let finale = base + valore.predictedEndTranslation.width
+                if finale < -completo {
+                    rimuovi()
+                } else if base + valore.translation.width < -larghezza / 2 {
+                    withAnimation(.snappy) {
+                        spostamento = -larghezza
+                        aperto = true
+                    }
+                } else {
+                    chiudi()
+                }
+            }
+    }
+
+    private func chiudi() {
+        withAnimation(.snappy) {
+            spostamento = 0
+            aperto = false
+        }
+    }
+
+    private func rimuovi() {
+        // La riga che prende il posto di quella tolta riparte chiusa.
+        spostamento = 0
+        aperto = false
+        withAnimation(.snappy) { togli() }
+    }
+}
