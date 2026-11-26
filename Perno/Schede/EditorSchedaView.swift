@@ -71,7 +71,7 @@ struct EditorSchedaView: View {
                     rigaEsercizio(esercizio, numero: indice + 1)
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing) {
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         rimuovi(esercizio)
                     } label: {

@@ -24,71 +24,78 @@ struct AggiungiEserciziView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Aggiungi esercizi")
-                        .font(.piastra(32))
-                        .foregroundStyle(Color.inchiostro)
-                    Text("Solo per oggi: le schede non cambiano")
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.inchiostroTenue)
-                }
-                Spacer()
-                PulsanteTondo(icona: "xmark", etichetta: "Chiudi") { dismiss() }
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.inchiostroTenue)
-                TextField("Cerca un esercizio", text: $ricerca)
-                    .font(.body)
-                    .foregroundStyle(Color.inchiostro)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-            .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    ForEach(sezioni) { sezione in
-                        VStack(spacing: 12) {
-                            EtichettaSezione(sezione.gruppo.label)
-                            Pila {
-                                ForEach(sezione.esercizi) { esercizio in
-                                    riga(esercizio)
-                                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                ForEach(sezioni) { sezione in
+                    VStack(spacing: 12) {
+                        EtichettaSezione(sezione.gruppo.label)
+                        Pila {
+                            ForEach(sezione.esercizi) { esercizio in
+                                riga(esercizio)
                             }
                         }
                     }
-                    if sezioni.isEmpty {
-                        Text("Nessun esercizio trovato.")
-                            .font(.body)
-                            .foregroundStyle(Color.inchiostroTenue)
-                            .padding(.leading, 4)
-                    }
-                    Text("Il numero indica l'ordine. Set e ripetizioni partono da 3 × 8–12; li cambi in sessione con + set.")
-                        .font(.footnote)
+                }
+                if sezioni.isEmpty {
+                    Text("Nessun esercizio trovato.")
+                        .font(.body)
                         .foregroundStyle(Color.inchiostroTenue)
                         .padding(.leading, 4)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("Il numero indica l'ordine. Set e ripetizioni partono da 3 × 8–12; li cambi in sessione con + set.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.inchiostroTenue)
+                    .padding(.leading, 4)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+        .barraFissa {
+            VStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aggiungi esercizi")
+                            .font(.piastra(32))
+                            .foregroundStyle(Color.inchiostro)
+                        Text("Solo per oggi: le schede non cambiano")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Color.inchiostroTenue)
+                    }
+                    Spacer()
+                    PulsanteTondo(icona: "xmark", etichetta: "Chiudi") { dismiss() }
+                }
 
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.inchiostroTenue)
+                    TextField("Cerca un esercizio", text: $ricerca)
+                        .font(.body)
+                        .foregroundStyle(Color.inchiostro)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 48)
+                .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 20)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             PulsanteGiallo(titolo: FreeSessionText.addButton(scelti.count), attivo: !scelti.isEmpty) {
                 let perId = Dictionary(libreria.map { ($0.id, $0) }, uniquingKeysWith: { primo, _ in primo })
                 sessione.aggiungi(scelti.compactMap { perId[$0] })
                 dismiss()
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
         }
-        .padding(.top, 24)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 12)
         .stileFoglio()
         .presentationDetents([.large])
     }

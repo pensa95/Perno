@@ -71,6 +71,9 @@ struct SezioniView: View {
     @State private var cornici = CorniciSessione()
     @State private var passaggio: PassaggioSessione?
     @State private var passaggioInCorso = false
+    /// Card «Sessione in corso» della Home nascosta mentre la sessione è aperta: ricompare con una
+    /// dissolvenza dopo il rilascio del trascina giù (A4).
+    @State private var cardNascosta = false
     @State private var numeroPassaggio = 0
     @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
@@ -117,7 +120,7 @@ struct SezioniView: View {
                          riprendi: riprendi,
                          apriSessione: { schermoSessione = true },
                          apriRiepilogo: { riepilogoInterrotta = $0 },
-                         nascondiCardInCorso: passaggioInCorso,
+                         nascondiCardInCorso: passaggioInCorso || cardNascosta,
                          misuraCardInCorso: { cornici.card = $0 })
             }
             .tabItem { Label(Sezione.allenati.titolo, systemImage: Sezione.allenati.icona) }
@@ -143,6 +146,15 @@ struct SezioniView: View {
         .overlay {
             if let passaggio, let sessione {
                 FantasmaSessione(sessione: sessione, passaggio: passaggio)
+            }
+        }
+        .onChange(of: schermoSessione) { _, aperta in
+            if aperta {
+                var senzaAnimazione = Transaction()
+                senzaAnimazione.disablesAnimations = true
+                withTransaction(senzaAnimazione) { cardNascosta = true }
+            } else {
+                withAnimation(.easeOut(duration: 0.3)) { cardNascosta = false }
             }
         }
         .onChange(of: sezione) { vecchia, nuova in

@@ -2,6 +2,11 @@ import SwiftUI
 import SwiftData
 import PernoCore
 
+/// Schermate raggiungibili dalla pagina Schede per valore.
+enum RottaSchede: Hashable {
+    case libreria
+}
+
 /// I Schede (canvas principale, pagina Schede): le tue schede, «Nuova scheda» giallo,
 /// «Libreria esercizi». Il piano settimanale ha una sezione a sé (Piano, richiesta del 24/11).
 struct SchedeView: View {
@@ -41,9 +46,7 @@ struct SchedeView: View {
                 .padding(.top, 12)
 
                 Pila {
-                    NavigationLink {
-                        LibreriaView(indietro: "Schede")
-                    } label: {
+                    NavigationLink(value: RottaSchede.libreria) {
                         VocePila(titolo: "Libreria esercizi", dettaglio: conteggioEsercizi)
                     }
                     .buttonStyle(.plain)
@@ -56,6 +59,11 @@ struct SchedeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        // Libreria per valore, come gli esercizi che si aprono da lì: mischiare link a destinazione
+        // e link a valore nella stessa pila riapriva la libreria al tocco su un esercizio (A1).
+        .navigationDestination(for: RottaSchede.self) { _ in
+            LibreriaView(indietro: "Schede")
+        }
         .navigationDestination(item: $nuovaScheda) { scheda in
             EditorSchedaView(scheda: scheda)
         }

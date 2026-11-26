@@ -623,3 +623,58 @@ extension Path {
         return totale
     }
 }
+
+// MARK: - Barra fissa con sfumatura
+
+/// Barra (ricerca, testata) fissa sopra una lista: i contenuti che scorrono sotto la barra sfumano
+/// gradualmente e, con la lista in cima, non c'è nessuna sfumatura. Da iOS 26 è l'effetto nativo
+/// (`safeAreaBar` + `scrollEdgeEffectStyle`); da iOS 18 una sfumatura manuale che compare con lo
+/// scostamento; su iOS 17 la barra è fissa senza sfumatura. `fondo` è il colore dietro la lista.
+struct BarraFissaSfumata<Barra: View>: ViewModifier {
+    let fondo: Color
+    @ViewBuilder let barra: () -> Barra
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content
+                .safeAreaBar(edge: .top, spacing: 0) { barra() }
+                .scrollEdgeEffectStyle(.soft, for: .top)
+        } else if #available(iOS 18, *) {
+            SfumaturaManuale(fondo: fondo, barra: barra) { content }
+        } else {
+            content.safeAreaInset(edge: .top, spacing: 0) { barra() }
+        }
+    }
+}
+
+@available(iOS 18, *)
+private struct SfumaturaManuale<Barra: View, Contenuto: View>: View {
+    let fondo: Color
+    let barra: () -> Barra
+    @ViewBuilder let contenuto: () -> Contenuto
+    @State private var scostamento: CGFloat = 0
+
+    var body: some View {
+        contenuto()
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y + geo.contentInsets.top
+            } action: { _, nuovo in
+                scostamento = nuovo
+            }
+            .overlay(alignment: .top) {
+                LinearGradient(colors: [fondo, fondo.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 20)
+                    .opacity(min(1, max(0, scostamento / 20)))
+                    .allowsHitTesting(false)
+            }
+            .safeAreaInset(edge: .top, spacing: 0) { barra() }
+    }
+}
+
+extension View {
+    /// Mette `barra` fissa in cima alla lista, con la sfumatura sotto quando i contenuti scorrono (vedi `BarraFissaSfumata`).
+    func barraFissa<Barra: View>(fondo: Color = .lamiera, @ViewBuilder _ barra: @escaping () -> Barra) -> some View {
+        modifier(BarraFissaSfumata(fondo: fondo, barra: barra))
+    }
+}

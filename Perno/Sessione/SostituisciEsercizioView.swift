@@ -38,83 +38,86 @@ struct SostituisciEsercizioView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Sostituisci \(vecchio.name)")
-                        .font(.piastra(32))
-                        .foregroundStyle(Color.inchiostro)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                    Text("Solo per oggi. I set fatti restano su \(vecchio.name), quelli da fare passano al nuovo.")
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.inchiostroTenue)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                PulsanteTondo(icona: "xmark", etichetta: "Chiudi") { dismiss() }
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.inchiostroTenue)
-                TextField("Cerca un esercizio", text: $ricerca)
-                    .font(.body)
-                    .foregroundStyle(Color.inchiostro)
-                    .autocorrectionDisabled()
-                    .submitLabel(.search)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-            .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Button {
-                        nuovoAperto = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 17, weight: .semibold))
-                            Text("Nuovo esercizio")
-                                .font(.body.weight(.semibold))
-                        }
-                        .foregroundStyle(Color.inchiostro)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background {
-                            BordoTratteggiato(colore: Color.inchiostro.opacity(0.3), spessore: 1.5,
-                                              trattino: 5, spazio: 4, raggio: 8)
-                        }
-                        .contentShape(Rectangle())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Button {
+                    nuovoAperto = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
+                        Text("Nuovo esercizio")
+                            .font(.body.weight(.semibold))
                     }
-                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.inchiostro)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background {
+                        BordoTratteggiato(colore: Color.inchiostro.opacity(0.3), spessore: 1.5,
+                                          trattino: 5, spazio: 4, raggio: 8)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
-                    ForEach(sezioni) { sezione in
-                        VStack(alignment: .leading, spacing: 12) {
-                            EtichettaSezione(sezione.gruppo.label)
-                            VStack(spacing: 4) {
-                                ForEach(sezione.esercizi) { voce in
-                                    riga(voce)
-                                }
+                ForEach(sezioni) { sezione in
+                    VStack(alignment: .leading, spacing: 12) {
+                        EtichettaSezione(sezione.gruppo.label)
+                        VStack(spacing: 4) {
+                            ForEach(sezione.esercizi) { voce in
+                                riga(voce)
                             }
                         }
                     }
-                    if sezioni.isEmpty {
-                        Text("Nessun esercizio trovato.")
-                            .font(.body)
-                            .foregroundStyle(Color.inchiostroTenue)
-                            .padding(.leading, 4)
-                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                if sezioni.isEmpty {
+                    Text("Nessun esercizio trovato.")
+                        .font(.body)
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .padding(.leading, 4)
+                }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.immediately)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
         }
-        .padding(.top, 24)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 12)
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+        .barraFissa {
+            VStack(spacing: 20) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sostituisci \(vecchio.name)")
+                            .font(.piastra(32))
+                            .foregroundStyle(Color.inchiostro)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                        Text("Solo per oggi. I set fatti restano su \(vecchio.name), quelli da fare passano al nuovo.")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Color.inchiostroTenue)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    PulsanteTondo(icona: "xmark", etichetta: "Chiudi") { dismiss() }
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.inchiostroTenue)
+                    TextField("Cerca un esercizio", text: $ricerca)
+                        .font(.body)
+                        .foregroundStyle(Color.inchiostro)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 48)
+                .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 20)
+        }
         .stileFoglio()
         .presentationDetents([.large])
         .sheet(isPresented: $nuovoAperto, onDismiss: {
