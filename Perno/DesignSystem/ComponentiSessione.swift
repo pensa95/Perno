@@ -17,6 +17,8 @@ struct PiastraSet: View {
     let nome: String
     let valore: String
     let stato: Stato
+    /// Avvicinamento: tinta calda (UI v6) al posto della grafite.
+    var calda = false
 
     var body: some View {
         Group {
@@ -43,7 +45,7 @@ struct PiastraSet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(etichetta)
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Color.piastraTenue)
+                    .foregroundStyle(calda ? Color.avvicinamentoTenue : Color.piastraTenue)
                 Text(valore)
                     .font(.piastra(48))
                     .monospacedDigit()
@@ -57,7 +59,7 @@ struct PiastraSet: View {
                     Text(evidenza).fontWeight(.semibold).foregroundStyle(Color.piastraTesto)
                 }
                 if let nota {
-                    Text(nota).foregroundStyle(Color.piastraTenue)
+                    Text(nota).foregroundStyle(calda ? Color.avvicinamentoTenue : Color.piastraTenue)
                 }
             }
             .font(.footnote.weight(.medium))
@@ -65,7 +67,8 @@ struct PiastraSet: View {
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88)
-        .background(Color.piastra, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(calda ? Color.avvicinamentoAdesso : Color.piastra,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(nome), adesso. \(valore)")
     }
@@ -76,12 +79,12 @@ struct PiastraSet: View {
                 if fatta {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .heavy))
-                        .foregroundStyle(Color.piastraFatta)
+                        .foregroundStyle(calda ? Color.avvicinamentoFatto : Color.piastraFatta)
                         .frame(width: 20, height: 20)
                         .background(Color.inchiostro, in: Circle())
                 } else {
                     Circle()
-                        .strokeBorder(Color.inchiostroTenue, lineWidth: 2)
+                        .strokeBorder(calda ? Color.riscaldamento : Color.inchiostroTenue, lineWidth: 2)
                         .frame(width: 20, height: 20)
                 }
             }
@@ -110,10 +113,12 @@ struct PiastraSet: View {
         .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
         .background {
             if fatta {
-                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.piastraFatta)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(calda ? Color.avvicinamentoFatto : Color.piastraFatta)
             } else {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.inchiostro.opacity(0.22), lineWidth: 1.5)
+                    .strokeBorder(calda ? Color.riscaldamento.opacity(0.38) : Color.inchiostro.opacity(0.22),
+                                  lineWidth: 1.5)
             }
         }
         .accessibilityElement(children: .combine)
