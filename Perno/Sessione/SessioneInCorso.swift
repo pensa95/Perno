@@ -27,11 +27,16 @@ final class SessioneInCorso: Identifiable {
     /// Secondi in cui l'avviso resta aperto (10 dalla UI v6); ogni tocco li rinnova.
     static let durataAvviso: TimeInterval = NoticeText.duration
 
-    /// Recupero in cronometro o alla rovescia: l'ultima scelta resta (anche tra le sessioni).
+    /// Recupero in cronometro o alla rovescia dell'esercizio di adesso (UI v6, T14): scelto nell'esercizio
+    /// della scheda e copiato nella sessione; il tocco sul tempo lo cambia solo per oggi.
     var modoRecupero: RestMode {
-        didSet { UserDefaults.standard.set(modoRecupero.rawValue, forKey: Self.chiaveModoRecupero) }
+        esercizioCorrente?.restMode ?? .stopwatch
     }
-    private static let chiaveModoRecupero = Impostazioni.modoRecupero
+
+    /// «Parti da solo a fine recupero» dell'esercizio di adesso (solo alla rovescia).
+    var partiDaSolo: Bool {
+        esercizioCorrente?.autoStartAfterRest ?? false
+    }
     /// Secondi aggiunti con «+15 s» al recupero che inizia in `inizio`.
     private var aggiunta: (inizio: Date, secondi: TimeInterval)? = nil
 
@@ -96,8 +101,6 @@ final class SessioneInCorso: Identifiable {
         } else {
             self.macchina = SessionMachine(exercises: piano, warmUp: riscaldamento, at: sessione.startedAt)
         }
-        self.modoRecupero = UserDefaults.standard.string(forKey: Self.chiaveModoRecupero)
-            .flatMap(RestMode.init(rawValue:)) ?? .stopwatch
         // Quello che è già nel registro non va riscritto.
         setScritti = macchina.completedSets.count
         pauseScritte = macchina.pauses.count
@@ -246,9 +249,12 @@ final class SessioneInCorso: Identifiable {
         RestTimer.label(fixed: esercizioCorrente?.fixedRest, usual: recuperoAbituale)
     }
 
-    /// Tocco sul tempo: cronometro ↔ conto alla rovescia.
+    /// Tocco sul tempo: cronometro ↔ conto alla rovescia, solo per questo esercizio e solo oggi
+    /// (la scheda non cambia).
     func cambiaModoRecupero() {
-        modoRecupero = modoRecupero.toggled
+        guard let esercizio = esercizioCorrente else { return }
+        esercizio.restMode = esercizio.restMode.toggled
+        try? context.save()
     }
 
     /// «+15 s» (solo nel conto alla rovescia): allunga il recupero in corso.

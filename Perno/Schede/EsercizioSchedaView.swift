@@ -19,6 +19,8 @@ struct EsercizioSchedaView: View {
     @State private var secondi: Int
     @State private var conPeso: Bool
     @State private var fixedRest: Double?
+    @State private var modoRecupero: RestMode
+    @State private var partiDaSolo: Bool
     @State private var setup: String
     @State private var cues: [String]
     @State private var nuovoPromemoria = ""
@@ -35,6 +37,8 @@ struct EsercizioSchedaView: View {
         _secondi = State(initialValue: entry.targetSeconds)
         _conPeso = State(initialValue: entry.withWeight)
         _fixedRest = State(initialValue: entry.fixedRest)
+        _modoRecupero = State(initialValue: entry.restMode)
+        _partiDaSolo = State(initialValue: entry.autoStartAfterRest)
         _setup = State(initialValue: entry.setup)
         _cues = State(initialValue: Cues.split(entry.cues))
     }
@@ -220,9 +224,13 @@ struct EsercizioSchedaView: View {
         }
     }
 
+    /// Recupero (UI v6, tavole J): Cronometro / Alla rovescia, durata di partenza («Parte dai tuoi tempi»,
+    /// tocco per fissarla), «Parti da solo a fine recupero» (solo alla rovescia) e la nota sul tocco in sessione.
     private var recupero: some View {
         VStack(spacing: 12) {
             EtichettaSezione("Recupero")
+            SelettoreSegmenti(valori: [RestMode.stopwatch, .countdown], selezione: $modoRecupero,
+                              etichetta: { $0 == .countdown ? "Alla rovescia" : "Cronometro" })
             if let fixedRest {
                 HStack(spacing: 12) {
                     Text("Fissato")
@@ -253,10 +261,22 @@ struct EsercizioSchedaView: View {
                 Button {
                     self.fixedRest = SessionStats.roundedRest(recuperoAbituale ?? EntryLimits.defaultFixedRest)
                 } label: {
-                    VocePila(titolo: "Dai tuoi tempi", sottotitolo: testoRecuperoAbituale)
+                    VocePila(titolo: "Parte dai tuoi tempi", sottotitolo: testoRecuperoAbituale)
                 }
                 .buttonStyle(.plain)
             }
+            if modoRecupero == .countdown {
+                Interruttore(titolo: "Parti da solo a fine recupero",
+                             sottotitolo: "A zero il 3-2-1 parte senza toccare",
+                             acceso: $partiDaSolo)
+            }
+            Text("In sessione puoi cambiarlo toccando il tempo: vale solo per quella volta.")
+                .font(.footnote)
+                .foregroundStyle(Color.inchiostroTenue)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 4)
+                .padding(.top, -4)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -383,6 +403,9 @@ struct EsercizioSchedaView: View {
         entry.targetSeconds = secondi
         entry.withWeight = conPeso
         entry.fixedRest = fixedRest
+        entry.restMode = modoRecupero
+        // «Parti da solo» vale solo alla rovescia.
+        entry.autoStartAfterRest = modoRecupero == .countdown && partiDaSolo
         entry.setup = setup.trimmingCharacters(in: .whitespacesAndNewlines)
         entry.cues = Cues.join(cues)
         try? context.save()

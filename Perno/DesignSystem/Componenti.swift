@@ -407,7 +407,7 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
         }
         .padding(2)
         .background(Color.piastraFatta, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .animation(menoMovimento ? nil : .snappy(duration: 0.28), value: selezione)
+        .animation(menoMovimento ? nil : .snappy(duration: 0.18), value: selezione)
     }
 }
 

@@ -23,7 +23,6 @@ struct SessioneView: View {
     /// Regolazioni (15 pt, 18 pt in evidenza) e icone accanto: crescono con «Testo più grande».
     @ScaledMetric(relativeTo: .subheadline) private var dimensioneRegolazioni: CGFloat = 15
     @ScaledMetric(relativeTo: .title3) private var dimensioneRegolazioniEvidenza: CGFloat = 18
-    @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
     @State private var sostituisciAperto = false
@@ -195,7 +194,7 @@ struct SessioneView: View {
 
     /// Fine del recupero alla rovescia, se deve partire da solo (impostazione attiva e set da fare).
     private var fineRecuperoAutomatica: Date? {
-        guard partiDaSolo, sessione.modoRecupero == .countdown, case let .rest(dal) = sessione.fase,
+        guard sessione.partiDaSolo, sessione.modoRecupero == .countdown, case let .rest(dal) = sessione.fase,
               sessione.setCorrente != nil else { return nil }
         return dal.addingTimeInterval(sessione.durataRecupero)
     }
