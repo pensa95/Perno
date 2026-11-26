@@ -32,6 +32,28 @@ public struct PlannedExercise: Equatable, Sendable {
     }
 }
 
+/// Obiettivi di oggi di un esercizio (UI v6): set di lavoro, peso (in chili) e ripetizioni.
+public struct TodayTargets: Equatable, Sendable {
+    public var sets: Int
+    public var weight: Double
+    public var reps: Int
+
+    public init(sets: Int, weight: Double, reps: Int) {
+        self.sets = sets
+        self.weight = weight
+        self.reps = reps
+    }
+
+    /// In scaletta: «3 × 40 × 10»; a tempo «3 × 0:45» o, con il peso, «3 × 10 × 0:45».
+    public func summary(seconds: Int? = nil, withWeight: Bool = true) -> String {
+        if let seconds {
+            let time = Clock.text(Double(seconds))
+            return withWeight ? "\(sets) × \(Units.show(weight)) × \(time)" : "\(sets) × \(time)"
+        }
+        return "\(sets) × \(Units.show(weight)) × \(reps)"
+    }
+}
+
 // MARK: - Registro
 
 public struct CompletedSet: Equatable, Sendable {
@@ -569,6 +591,46 @@ extension SessionMachine {
                 }
             }
         }
+    }
+
+    /// Obiettivi di oggi di un esercizio (UI v6, tavola 11): set di lavoro, peso e ripetizioni del primo set
+    /// di lavoro. `nil` se l'esercizio non ha set di lavoro.
+    public func todayTargets(exercise: Int) -> TodayTargets? {
+        guard exercises.indices.contains(exercise) else { return nil }
+        let work = exercises[exercise].sets.filter { $0.kind != .approach }
+        guard let first = work.first else { return nil }
+        return TodayTargets(sets: work.count, weight: first.weight, reps: first.reps)
+    }
+
+    /// Gli obiettivi di oggi si cambiano solo su un esercizio non ancora cominciato (nessun set fatto e,
+    /// se è quello di adesso, prima del primo «Inizia»).
+    public func canSetTodayTargets(exercise: Int) -> Bool {
+        guard exercises.indices.contains(exercise),
+              !exercises[exercise].sets.indices.contains(where: { isDone(exercise: exercise, set: $0) }) else {
+            return false
+        }
+        if exercise == currentExerciseIndex {
+            switch phase {
+            case .changeover, .warmUp: return true
+            default: return false
+            }
+        }
+        return true
+    }
+
+    /// «Obiettivi di oggi» → «Salva»: valgono per tutti i set di lavoro di oggi (stesso peso e ripetizioni,
+    /// `sets` set); gli avvicinamenti restano quanti erano, con il peso ricalcolato in percentuale del peso
+    /// nuovo. Solo per questa sessione: la scheda non cambia.
+    public mutating func setTodayTargets(exercise: Int, targets: TodayTargets, step: Double) throws {
+        guard canSetTodayTargets(exercise: exercise) else { throw SessionError.invalidTransition }
+        let approaches = exercises[exercise].sets.filter { $0.kind == .approach }
+        let weights = Approach.weights(count: approaches.count, workWeight: targets.weight, step: step)
+        let warmUps = zip(approaches, weights).map { PlannedSet(kind: .approach, weight: $1, reps: $0.reps) }
+        let work = (0..<max(targets.sets, 1)).map { _ in
+            PlannedSet(kind: .work, weight: targets.weight, reps: targets.reps)
+        }
+        exercises[exercise].sets = warmUps + work
+        if exercise == currentExerciseIndex { setIndex = 0 }
     }
 
     /// «Sostituisci» si può usare su questo esercizio: ha set da fare e non c'è un suo set in corso.
