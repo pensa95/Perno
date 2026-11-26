@@ -58,7 +58,8 @@ struct SessioneLiveActivity: Widget {
                     .padding(.top, 8)
                 }
             } compactLeading: {
-                PuntoPerno(dimensione: 20)
+                // Perno nel colore della fase, come il tempo (tavola «DI Dynamic Island»).
+                PuntoPerno(dimensione: 21, colore: colori.tintaIsola)
             } compactTrailing: {
                 TempoSessione(stato: stato, dimensione: 20, grande: false)
                     .foregroundStyle(colori.tintaIsola)
@@ -136,13 +137,15 @@ struct CardBloccoSchermo: View {
 
 // MARK: - Pezzi
 
-/// Il perno: disco giallo con il foro scuro (come sulla piastra di adesso).
+/// Il perno: disco giallo con il foro scuro (come sulla piastra di adesso). Nella Dynamic Island
+/// compatta il disco prende il colore della fase.
 struct PuntoPerno: View {
     let dimensione: CGFloat
+    var colore: Color = .perno
 
     var body: some View {
         ZStack {
-            Circle().fill(Color.perno)
+            Circle().fill(colore)
             Circle().fill(Color.suPerno).frame(width: dimensione * 0.3, height: dimensione * 0.3)
         }
         .frame(width: dimensione, height: dimensione)

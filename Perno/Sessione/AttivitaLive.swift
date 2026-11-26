@@ -1,4 +1,5 @@
 import ActivityKit
+import Observation
 import SwiftUI
 import UserNotifications
 import PernoCore
@@ -7,6 +8,11 @@ import PernoCore
 /// «Salva sessione», con l'eliminazione o con la chiusura automatica (quando non c'è più una
 /// sessione viva). Esegue anche i pulsanti della card, che girano nel processo dell'app.
 /// A zero del recupero alla rovescia arriva la notifica «Recupero finito».
+///
+/// La card segue la sessione da sola (T3): osserva i dati che mostra (`ingressoLive`) con Observation e
+/// ha un suo timer per lo zero del recupero, senza passare dalle viste. Con l'app in background SwiftUI non
+/// ridisegna le viste, quindi un aggiornamento affidato a `onChange` arrivava solo alla riapertura (la card
+/// restava al recupero dopo «Inizia set» col telefono bloccato).
 @MainActor
 final class AttivitaLive {
     static let shared = AttivitaLive()
@@ -16,6 +22,11 @@ final class AttivitaLive {
     private weak var sessione: SessioneInCorso?
     private var notificaChiesta = false
     private static let idNotifica = "perno.recupero.finito"
+    /// Ogni osservazione nuova incrementa il turno: le vecchie, quando scattano, non fanno niente.
+    private var turnoOsservazione = 0
+    /// Prossimo cambio da solo della card (zero del recupero alla rovescia) e il compito che lo aspetta.
+    private var prossimoCambio: Date?
+    private var compitoCambio: Task<Void, Never>?
 
     private init() {
         AzioniSessione.gestore = { [weak self] azione in
@@ -33,9 +44,10 @@ final class AttivitaLive {
         // Audio acceso per tutta la sessione (T1): l'app non viene sospesa e i bip partono anche dalla card.
         Segnali.shared.tieniAcceso(true)
         chiediPermessoNotifiche()
-        let ingresso = sessione.ingressoLive
+        let ingresso = osserva(sessione)
         let stato = LiveActivityText.state(for: ingresso, now: ora)
         programmaNotifica(ingresso: ingresso, ora: ora)
+        programmaCambio(LiveActivityText.nextChange(for: ingresso, now: ora))
         guard stato != ultimo || attivita == nil else { return }
         ultimo = stato
         let contenuto = ActivityContent(state: stato, staleDate: nil)
@@ -60,10 +72,47 @@ final class AttivitaLive {
     /// Nessuna sessione viva: card e notifica spariscono.
     func termina() {
         Segnali.shared.tieniAcceso(false)
+        turnoOsservazione += 1
+        programmaCambio(nil)
         attivita = nil
         ultimo = nil
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.idNotifica])
         chiudiAltre(tranne: nil)
+    }
+
+    /// Legge i dati della card registrando l'osservazione: al primo cambio (anche con l'app in background)
+    /// la card si aggiorna e l'osservazione riparte.
+    private func osserva(_ sessione: SessioneInCorso) -> LiveActivityInput {
+        turnoOsservazione += 1
+        let turno = turnoOsservazione
+        return withObservationTracking {
+            sessione.ingressoLive
+        } onChange: { [weak self, weak sessione] in
+            // Scatta prima del cambio: la card si rilegge subito dopo, sul main actor.
+            Task { @MainActor [weak self, weak sessione] in
+                guard let self, let sessione, turno == self.turnoOsservazione,
+                      self.sessione === sessione else { return }
+                self.mostra(sessione)
+            }
+        }
+    }
+
+    /// Allo zero del recupero alla rovescia la card passa da sola a «tempo in più».
+    private func programmaCambio(_ momento: Date?) {
+        guard momento != prossimoCambio else { return }
+        prossimoCambio = momento
+        compitoCambio?.cancel()
+        compitoCambio = nil
+        guard let momento else { return }
+        compitoCambio = Task { @MainActor [weak self] in
+            let attesa = momento.timeIntervalSinceNow
+            if attesa > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000) + 200_000_000)
+            }
+            guard !Task.isCancelled, let self, self.prossimoCambio == momento else { return }
+            self.prossimoCambio = nil
+            if let sessione = self.sessione { self.mostra(sessione) }
+        }
     }
 
     private func chiudiAltre(tranne id: String?) {
@@ -180,33 +229,22 @@ extension SessioneInCorso {
     }
 }
 
-/// Vista invisibile nella radice dell'app: a ogni cambio della sessione aggiorna la Live Activity,
-/// e allo zero del recupero alla rovescia la fa passare a «tempo in più».
+/// Vista invisibile nella radice dell'app: dice ad `AttivitaLive` quale sessione è viva (o che non ce n'è
+/// più). Gli aggiornamenti della card durante la sessione li fa `AttivitaLive` da sola (osservazione e timer),
+/// anche con l'app in background; qui si ripassa anche al ritorno in primo piano.
 struct OsservatoreAttivitaLive: View {
     let sessione: SessioneInCorso?
-    @State private var scatto = 0
+    @Environment(\.scenePhase) private var fase
 
     var body: some View {
-        let stato = sessione.map { LiveActivityText.state(for: $0.ingressoLive, now: .now) }
-        let prossimo = sessione.flatMap { LiveActivityText.nextChange(for: $0.ingressoLive, now: .now) }
         Color.clear
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
-            .onChange(of: stato, initial: true) { _, _ in
+            .onChange(of: sessione?.id, initial: true) { _, _ in
                 AttivitaLive.shared.mostra(sessione)
             }
-            .onChange(of: sessione?.id) { _, _ in
+            .onChange(of: fase) { _, _ in
                 AttivitaLive.shared.mostra(sessione)
             }
-            .task(id: prossimo) {
-                guard let prossimo else { return }
-                let attesa = prossimo.timeIntervalSinceNow
-                if attesa > 0 {
-                    try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000) + 200_000_000)
-                }
-                guard !Task.isCancelled else { return }
-                scatto += 1
-            }
-            .id(scatto)
     }
 }
