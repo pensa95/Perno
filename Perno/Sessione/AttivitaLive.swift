@@ -30,6 +30,8 @@ final class AttivitaLive {
             termina()
             return
         }
+        // Audio acceso per tutta la sessione (T1): l'app non viene sospesa e i bip partono anche dalla card.
+        Segnali.shared.tieniAcceso(true)
         chiediPermessoNotifiche()
         let ingresso = sessione.ingressoLive
         let stato = LiveActivityText.state(for: ingresso, now: ora)
@@ -57,6 +59,7 @@ final class AttivitaLive {
 
     /// Nessuna sessione viva: card e notifica spariscono.
     func termina() {
+        Segnali.shared.tieniAcceso(false)
         attivita = nil
         ultimo = nil
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.idNotifica])
@@ -92,9 +95,10 @@ final class AttivitaLive {
         mostra(sessione)
     }
 
-    /// «Inizia set» dal blocco schermo: con l'app sospesa la schermata della sessione non gira,
-    /// quindi il 3-2-1 lo porta a termine l'azione stessa. I bip vanno in coda tutti insieme
-    /// (audio in background): mentre suonano l'app resta sveglia e allo zero fa partire il set.
+    /// «Inizia set» dal blocco schermo: la schermata della sessione può non esserci (sessione ridotta),
+    /// quindi il 3-2-1 lo porta a termine l'azione stessa. I bip vanno in coda tutti insieme; con l'audio
+    /// tenuto acceso per tutta la sessione l'app è sveglia e suonano subito. Se anche la schermata li chiede,
+    /// la stessa sequenza non si programma due volte e il set parte una volta sola.
     private func contoAllaRovescia(_ sessione: SessioneInCorso) async {
         guard case let .countdown(dal, _, _) = sessione.fase else { return }
         let totale = sessione.secondiContoAllaRovescia

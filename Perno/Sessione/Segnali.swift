@@ -1,29 +1,143 @@
 import AVFoundation
 import UIKit
 
-/// Bip e vibrazione del 3-2-1 e della fine del recupero alla rovescia («Prima di ogni set» nelle Impostazioni).
+/// Bip e vibrazione del 3-2-1, della fine del recupero alla rovescia e dei set a tempo.
+///
+/// **Audio sempre acceso (T1, in prova)**: dall'inizio alla fine della sessione l'app tiene acceso
+/// l'audio con un silenzio in loop, in mix con la musica (`.playback` + `.mixWithOthers`, come le app
+/// Tabata). Così iOS non sospende mai l'app (`UIBackgroundModes: audio`) e i bip partono anche quando
+/// il set si avvia dalla Live Activity o dalla Dynamic Island, a schermo bloccato e in silenzioso.
+/// Solo durante una sequenza di bip la sessione passa a `.duckOthers` (la musica si abbassa) e poi torna
+/// al mix. Si spegne tutto con la fine della sessione (Salva, Elimina, chiusura automatica).
+/// Per tornare a prima (audio solo durante i bip) basta mettere `audioSempreAcceso` a `false`.
 ///
 /// I bip di una sequenza (3, 2, 1 e il «via», più alto) sono un solo suono preparato all'inizio e messo
-/// in coda tutto insieme: così suona fino in fondo anche se lo schermo si blocca o l'app va in background
-/// (`UIBackgroundModes: audio` in `project.yml`; mentre suona, iOS tiene l'app sveglia). La musica si abbassa
-/// per la durata della sequenza (audio session con ducking) e poi torna al suo volume.
-/// Timbro «legno» (scelta dell'utente del 24/11, campione B): attacco netto, coda breve, passa-basso.
-/// Le vibrazioni restano a ogni secondo e si sentono solo con l'app in primo piano.
+/// in coda tutto insieme. Timbro «legno» (scelta dell'utente del 24/11, campione B): attacco netto, coda
+/// breve, passa-basso. Le vibrazioni restano a ogni secondo e si sentono solo con l'app in primo piano.
 @MainActor
 final class Segnali {
     static let shared = Segnali()
 
+    /// Interruttore della prova T1: `false` = audio acceso solo durante i bip (comportamento di prima).
+    static let audioSempreAcceso = true
+
     private let motore = AVAudioEngine()
     private let lettore = AVAudioPlayerNode()
+    /// Silenzio in loop che tiene l'app sveglia per tutta la sessione.
+    private let silenzio = AVAudioPlayerNode()
     private let formato = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var collegato = false
+    /// C'è una sessione viva e l'audio va tenuto acceso.
+    private var tenuto = false
+    /// La musica è abbassata (sequenza di bip in corso).
+    private var abbassata = false
     /// Ogni sequenza incrementa il turno: la sessione audio si rilascia solo dopo l'ultima.
     private var turno = 0
     /// «Via» della sequenza in coda: la stessa sequenza non si programma due volte
     /// (la schermata e il pulsante della Live Activity possono chiederla insieme).
     private var viaInCoda: Date?
 
-    private init() {}
+    private init() {
+        let centro = NotificationCenter.default
+        // Telefonata, Siri, sveglia: a interruzione finita l'audio riparte.
+        centro.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { avviso in
+            let valore = avviso.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            guard valore == AVAudioSession.InterruptionType.ended.rawValue else { return }
+            Task { @MainActor in Segnali.shared.riprendi() }
+        }
+        // Cuffie collegate o staccate: il motore si ferma e va riavviato.
+        centro.addObserver(forName: .AVAudioEngineConfigurationChange, object: motore, queue: .main) { _ in
+            Task { @MainActor in Segnali.shared.riprendi() }
+        }
+        centro.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil,
+                           queue: .main) { _ in
+            Task { @MainActor in Segnali.shared.riprendi() }
+        }
+    }
+
+    // MARK: Audio della sessione
+
+    /// Da chiamare a ogni cambio della sessione viva: `true` finché la sessione c'è, `false` quando finisce.
+    /// Chiamate ripetute costano poco; se nel frattempo l'audio si è fermato, riparte.
+    func tieniAcceso(_ acceso: Bool) {
+        guard Self.audioSempreAcceso else { return }
+        if acceso {
+            tenuto = true
+            if !motore.isRunning || !silenzio.isPlaying { riprendi() }
+        } else if tenuto {
+            tenuto = false
+            turno += 1
+            viaInCoda = nil
+            spegni()
+        }
+    }
+
+    /// Riaccende l'audio della sessione (dopo un'interruzione o un cambio di uscita), se serve.
+    private func riprendi() {
+        guard tenuto else { return }
+        if !motore.isRunning { silenzio.stop() }
+        do {
+            try attiva(abbassa: abbassata)
+        } catch {
+            // Al prossimo cambio della sessione (o al ritorno in primo piano) si riprova.
+        }
+    }
+
+    /// Imposta la sessione audio, avvia il motore e il silenzio in loop.
+    private func attiva(abbassa: Bool) throws {
+        let sessione = AVAudioSession.sharedInstance()
+        try sessione.setCategory(.playback, mode: .default, options: abbassa ? [.duckOthers] : [.mixWithOthers])
+        try sessione.setActive(true)
+        collega()
+        if !motore.isRunning { try motore.start() }
+        if tenuto, !silenzio.isPlaying, let vuoto = bufferSilenzio {
+            silenzio.scheduleBuffer(vuoto, at: nil, options: .loops)
+            silenzio.play()
+        }
+    }
+
+    /// Passa dal mix al ducking o al contrario. Per alzare di nuovo la musica iOS vuole che la sessione
+    /// si disattivi: si ferma il motore un istante, si disattiva, si riattiva in mix e si riparte.
+    private func cambiaVolumeMusica(abbassa: Bool) throws {
+        guard abbassa != abbassata || !motore.isRunning else { return }
+        abbassata = abbassa
+        if abbassa {
+            try attiva(abbassa: true)
+            return
+        }
+        silenzio.stop()
+        lettore.stop()
+        motore.stop()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        try attiva(abbassa: false)
+    }
+
+    /// Fine della sessione: niente più audio, la musica torna al suo volume.
+    private func spegni() {
+        abbassata = false
+        silenzio.stop()
+        lettore.stop()
+        motore.stop()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func collega() {
+        guard !collegato else { return }
+        motore.attach(lettore)
+        motore.attach(silenzio)
+        motore.connect(lettore, to: motore.mainMixerNode, format: formato)
+        motore.connect(silenzio, to: motore.mainMixerNode, format: formato)
+        collegato = true
+    }
+
+    /// Un secondo di silenzio, ripetuto in loop.
+    private lazy var bufferSilenzio: AVAudioPCMBuffer? = {
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: formato, frameCapacity: 44_100),
+              let canale = buffer.floatChannelData?[0] else { return nil }
+        buffer.frameLength = 44_100
+        for indice in 0..<44_100 { canale[indice] = 0 }
+        return buffer
+    }()
 
     // MARK: Sequenza
 
@@ -40,15 +154,15 @@ final class Segnali {
         suoni.append((max(0, via.timeIntervalSince(adesso)), Self.via))
         guard let buffer = buffer(suoni) else { return }
         do {
-            let sessione = AVAudioSession.sharedInstance()
-            try sessione.setCategory(.playback, mode: .default, options: [.duckOthers])
-            try sessione.setActive(true)
-            if !collegato {
-                motore.attach(lettore)
-                motore.connect(lettore, to: motore.mainMixerNode, format: formato)
-                collegato = true
+            if tenuto {
+                try cambiaVolumeMusica(abbassa: true)
+            } else {
+                let sessione = AVAudioSession.sharedInstance()
+                try sessione.setCategory(.playback, mode: .default, options: [.duckOthers])
+                try sessione.setActive(true)
+                collega()
+                if !motore.isRunning { try motore.start() }
             }
-            if !motore.isRunning { try motore.start() }
             lettore.stop()
             turno += 1
             let questo = turno
@@ -72,13 +186,17 @@ final class Segnali {
         rilascia(dopo: turno)
     }
 
-    /// Ferma il motore e restituisce l'audio alla musica, se nel frattempo non è partita un'altra sequenza.
+    /// Fine della sequenza, se nel frattempo non ne è partita un'altra: con la sessione viva l'audio resta
+    /// acceso in mix e la musica torna su; senza, si ferma il motore e l'audio torna alla musica.
     private func rilascia(dopo questo: Int) {
         guard questo == turno else { return }
         viaInCoda = nil
         lettore.stop()
-        motore.stop()
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if tenuto {
+            try? cambiaVolumeMusica(abbassa: false)
+        } else {
+            spegni()
+        }
     }
 
     private func buffer(_ suoni: [(inizio: TimeInterval, tono: [Float])]) -> AVAudioPCMBuffer? {
