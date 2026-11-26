@@ -71,7 +71,7 @@ final class DeleteSetTests: XCTestCase {
         XCTAssertTrue(m.canDeleteUndoneSet(exercise: 0, set: 2))
         try m.countdownFinished(at: t0.addingTimeInterval(103))
         XCTAssertFalse(m.canDeleteUndoneSet(exercise: 0, set: 1))
-        XCTThrowsError(try m.deleteUndoneSet(exercise: 0, set: 1, at: t0.addingTimeInterval(110)))
+        XCTAssertThrowsError(try m.deleteUndoneSet(exercise: 0, set: 1, at: t0.addingTimeInterval(110)))
         // Un esercizio tiene almeno un set.
         var solo = SessionMachine(exercises: [PlannedExercise(name: "C", sets: [PlannedSet(kind: .work, weight: 0, reps: 8)])],
                                   warmUp: false, at: t0)
