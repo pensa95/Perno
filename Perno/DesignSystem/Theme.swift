@@ -23,6 +23,12 @@ extension Color {
     static let riscaldamentoTenue = Color.token(light: 0xFFF1EA, dark: 0xFFF1EA)
     static let errore = Color.token(light: 0xB3261E, dark: 0xF2867C)
 
+    // Avvicinamenti in tinta calda (UI v6, tavola «2 Cambio esercizio»): piastra fatta, piastra di adesso
+    // e il suo testo tenue. Da fare: bordo e cerchio `riscaldamento` (al 38% il bordo).
+    static let avvicinamentoFatto = Color.token(light: 0xEADFD6, dark: 0x2E2824)
+    static let avvicinamentoAdesso = Color.token(light: 0x3A302A, dark: 0x43372F)
+    static let avvicinamentoTenue = Color.token(light: 0xC4BAB2, dark: 0xC4BAB2)
+
     // Derivati per il tema scuro (tavole «Home, scuro», «Set in corso, scuro», «Recupero, scuro»).
     /// Testo e icone sopra un fondo inchiostro (pulsante «Set N fatto», scelte piene).
     static let suInchiostro = Color.token(light: 0xFFFFFF, dark: 0x14181B)

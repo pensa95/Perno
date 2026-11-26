@@ -287,33 +287,15 @@ struct SessioneView: View {
 
     // MARK: Riscaldamento
 
+    /// Tavola 1 (UI v6): stesso layout delle altre fasi, senza icona (il colore lo dà il dock);
+    /// sottotitolo «A seguire:» sopra l'elenco degli esercizi.
     private var riscaldamento: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: "flame")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 56, height: 56)
-                    .background(Color.riscaldamento, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Text("Prima di cominciare")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.inchiostroTenue)
-                    .padding(.top, 8)
-                Text("Riscaldamento")
-                    .font(.piastra(40))
-                    .foregroundStyle(Color.inchiostro)
-                Text("Cardio leggero e mobilità. Il tempo resta separato da quello degli esercizi.")
-                    .font(.body)
-                    .foregroundStyle(Color.inchiostroTenue)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.top, 32)
+            titoloEsercizio("Riscaldamento",
+                            sottotitolo: sessione.ordineDiOggi.isEmpty ? nil : "A seguire:")
+                .padding(.top, 24)
 
             if !sessione.ordineDiOggi.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Poi, in ordine")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.inchiostroTenue)
                 Pila {
                     ForEach(Array(sessione.ordineDiOggi.enumerated()), id: \.offset) { indice, esercizio in
                         HStack(spacing: 12) {
@@ -332,8 +314,25 @@ struct SessioneView: View {
                         .vocePila(altezza: 52)
                     }
                 }
+                .padding(.top, 16)
             }
-            .padding(.top, 24)
+        }
+    }
+
+    /// Testata dell'esercizio (UI v6, tavole 1–7): nome sopra (40 pt), sottotitolo sotto (15 pt, tenue).
+    private func titoloEsercizio(_ nome: String, sottotitolo: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(nome)
+                .font(.piastra(40))
+                .foregroundStyle(Color.inchiostro)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .accessibilityAddTraits(.isHeader)
+            if let sottotitolo {
+                Text(sottotitolo)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Color.inchiostroTenue)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -348,30 +347,17 @@ struct SessioneView: View {
     @ViewBuilder
     private var esercizio: some View {
         if let esercizio = sessione.esercizioCorrente, let indice = sessione.indiceEsercizio {
-            HStack(alignment: .bottom, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(esercizio.isTimed
-                         ? TimedText.exerciseHeader(position: sessione.numeroEsercizio,
-                                                    count: sessione.esercizi.count,
-                                                    sets: sessione.setDiLavoro(di: indice).totale,
-                                                    seconds: sessione.set[indice].first
-                                                        .map(sessione.obiettivoSecondi) ?? esercizio.targetSeconds)
-                         : SessionText.exerciseHeader(position: sessione.numeroEsercizio,
-                                                      count: sessione.esercizi.count,
-                                                      repsMin: esercizio.repsMin, repsMax: esercizio.repsMax))
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.inchiostroTenue)
-                    Text(esercizio.name)
-                        .font(.piastra(40))
-                        .foregroundStyle(Color.inchiostro)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
+            HStack(alignment: .top, spacing: 8) {
+                titoloEsercizio(esercizio.name, sottotitolo: esercizio.isTimed
+                    ? TimedText.exerciseHeader(position: sessione.numeroEsercizio,
+                                               count: sessione.esercizi.count,
+                                               sets: sessione.setDiLavoro(di: indice).totale,
+                                               seconds: sessione.set[indice].first
+                                                   .map(sessione.obiettivoSecondi) ?? esercizio.targetSeconds)
+                    : SessionText.exerciseHeader(position: sessione.numeroEsercizio,
+                                                 count: sessione.esercizi.count,
+                                                 repsMin: esercizio.repsMin, repsMax: esercizio.repsMax))
                 Spacer(minLength: 0)
-                PulsanteTondo(icona: "chart.line.uptrend.xyaxis", etichetta: "Progressi") {
-                    progressi = esercizio.exercise
-                }
-                .disabled(esercizio.exercise == nil)
                 menuEsercizio(esercizio)
             }
             .padding(.top, 24)
@@ -393,25 +379,30 @@ struct SessioneView: View {
         }
     }
 
-    /// Menu «…» dell'esercizio: nota per questa sessione, + set, Rimanda.
+    /// Menu «…» dell'esercizio (tavola 12, UI v6): Aggiungi nota, Sostituisci (arriva con T10, finché non
+    /// c'è resta nascosto), Progressi, Rimanda. «Aggiungi set» non è più qui (pulsante sotto i set, T9).
     private func menuEsercizio(_ esercizio: SessionExercise) -> some View {
         Menu {
             Button {
                 testoNota = esercizio.note
                 scriviNota = true
             } label: {
-                Label(esercizio.note.isEmpty ? "Aggiungi nota" : "Modifica nota", systemImage: "text.bubble")
+                Text(esercizio.note.isEmpty ? "Aggiungi nota" : "Modifica nota")
+                Text("La ritrovi la prossima volta")
+                Image(systemName: "text.bubble")
             }
             Button {
-                sessione.aggiungiSet()
+                progressi = esercizio.exercise
             } label: {
-                Label("Aggiungi set", systemImage: "plus")
+                Text("Progressi")
+                Image(systemName: "chart.line.uptrend.xyaxis")
             }
-            .disabled(sessione.macchina.currentExerciseIndex == nil)
+            .disabled(esercizio.exercise == nil)
             Button {
                 sessione.rimanda()
             } label: {
-                Label("Rimanda", systemImage: "arrow.uturn.down")
+                Text("Rimanda")
+                Image(systemName: "arrow.right")
             }
             .disabled(!sessione.puoRimandare)
         } label: {
@@ -431,7 +422,7 @@ struct SessioneView: View {
                 }
             }
         } message: {
-            Text("Vale solo per questa sessione.")
+            Text("La ritrovi la prossima volta.")
         }
     }
 
@@ -494,33 +485,29 @@ struct SessioneView: View {
         let numeri = SessionText.numbers(sessione.set[indice].map(\.kind))
         let numero = numeri[posizione]
         let nome = SessionText.shortName(set.kind, numero)
-        let approcci = sessione.esercizi[indice].approachCount
         let prima = set.kind == .approach ? nil : sessione.prima[indice][safe: numero - 1]
         let notaPrima = prima.map { "prima " + SessionText.weightReps($0.weight, $0.reps) }
 
+        // Avvicinamenti in tinta calda e senza percentuale (tavola 2, UI v6).
+        let calda = set.kind == .approach
         if set.isDone, let peso = set.weight, let ripetizioni = set.reps {
-            let nota = set.kind == .approach
-                ? SessionText.approachPercent(number: numero, count: approcci)
-                : notaPrima
-            return PiastraSet(nome: nome, valore: SessionText.weightReps(peso, ripetizioni), stato: .fatta(nota: nota))
+            return PiastraSet(nome: nome, valore: SessionText.weightReps(peso, ripetizioni),
+                              stato: .fatta(nota: calda ? nil : notaPrima), calda: calda)
         }
 
         let obiettivo = SessionText.weightReps(set.targetWeight, set.targetReps)
         guard posizione == sessione.macchina.setIndex else {
-            return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare)
+            return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare, calda: calda)
         }
 
         let inCorso: Bool = {
             if case .inSet = sessione.fase { return true }
             return false
         }()
-        if set.kind == .approach {
-            let lavoro = sessione.set[indice].first { $0.kind != .approach }?.targetWeight
-            let percento = SessionText.approachPercent(number: numero, count: approcci)
-            let nota = percento.map { p in lavoro.map { "\(p) di \(Units.show($0))" } ?? p }
+        if calda {
             return PiastraSet(nome: nome, valore: obiettivo, stato: .adesso(
                 etichetta: inCorso ? "\(nome), in corso" : "\(nome), avvicinamento",
-                evidenza: nil, nota: nota))
+                evidenza: nil, nota: nil), calda: true)
         }
         let differenza = prima.flatMap { SessionText.delta(today: set.targetWeight, before: $0.weight) }
         return PiastraSet(nome: nome, valore: obiettivo, stato: .adesso(
