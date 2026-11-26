@@ -414,7 +414,10 @@ struct ScorriPerTogliere: ViewModifier {
                     }
                     .opacity(spostamento < 0 ? 1 : 0)
                 content
-                    .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    // Il fondo copre il rosso solo mentre si scorre (ferma, la piastra da fare resta trasparente,
+                    // anche sul fondo caldo del set in corso).
+                    .background(Color.lamiera.opacity(spostamento < 0 ? 1 : 0),
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .shadow(color: Color.ombra.opacity(spostamento < 0 ? 0.12 : 0), radius: 6, x: 4, y: 0)
                     .overlay {
                         // Aperto: un tocco sulla piastra la richiude (non apre Correggi set).

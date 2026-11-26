@@ -99,7 +99,8 @@ struct SessioneView: View {
                     }
                 }
         }
-        .background(Color.lamiera.ignoresSafeArea())
+        // Fondo caldo con le fiamme durante il set in corso (T15, in prova: rollback in `SfondoFiamme.swift`).
+        .background(SfondoSessione(setInCorso: inSetFase))
         .task(id: inizioContoAllaRovescia) {
             guard let dal = inizioContoAllaRovescia else { return }
             let fine = Countdown.end(since: dal)
@@ -440,6 +441,12 @@ struct SessioneView: View {
         default:
             EmptyView()
         }
+    }
+
+    /// Fase «set in corso» (per lo sfondo con le fiamme).
+    private var inSetFase: Bool {
+        if case .inSet = sessione.fase { return true }
+        return false
     }
 
     /// Recupero in corso: il set di adesso è «prossimo» (la piastrina del recupero è «adesso»).
