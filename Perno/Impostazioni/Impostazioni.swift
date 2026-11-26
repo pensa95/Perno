@@ -9,6 +9,8 @@ enum Impostazioni {
     static let bip = "impostazioni.bip"
     static let vibrazione = "impostazioni.vibrazione"
     /// Stessa chiave usata in sessione quando si tocca il tempo del recupero.
+    /// Recupero scelto fino alla UI v5 (nelle Impostazioni): dalla v6 è nell'esercizio della scheda; restano
+    /// solo per la migrazione allo SchemaV3 e per i backup vecchi.
     static let modoRecupero = "recupero.modo"
     static let partiDaSolo = "impostazioni.partiDaSolo"
     /// «Chiedi com'è andato» (UI v6; stessa chiave della vecchia «Chiedi quante ne avevi ancora»).
@@ -79,7 +81,7 @@ final class Aspetto {
 
 // MARK: - Impostazioni
 
-/// Impostazioni (tavola «Impostazioni», sezione della barra dal 24/11): Aspetto, Riscaldamento, Segnali (3-2-1 sempre 3 s, UI v6), Recupero,
+/// Impostazioni (tavola «Impostazioni», sezione della barra dal 24/11): Aspetto, Riscaldamento, Segnali (3-2-1 sempre 3 s; il recupero è nell'esercizio della scheda, UI v6),
 /// Dopo ogni set, Dati.
 struct ImpostazioniView: View {
     @Environment(Aspetto.self) private var aspetto
@@ -87,8 +89,6 @@ struct ImpostazioniView: View {
     @AppStorage(Impostazioni.riscaldamento) private var riscaldamento = true
     @AppStorage(Impostazioni.bip) private var bip = true
     @AppStorage(Impostazioni.vibrazione) private var vibrazione = true
-    @AppStorage(Impostazioni.modoRecupero) private var modoRecupero: RestMode = .stopwatch
-    @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
     @AppStorage(Impostazioni.chiediFaccina) private var chiediFaccina = true
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
     @AppStorage(Impostazioni.passo) private var passo = PlateStep.standard
@@ -114,7 +114,7 @@ struct ImpostazioniView: View {
                                  acceso: $riscaldamento)
                 }
 
-                sezione("Segnali", nota: "Il 3-2-1 prima di ogni set dura sempre 3 s.") {
+                sezione("Segnali", nota: "Il 3-2-1 prima di ogni set dura sempre 3 s. Il recupero si sceglie in ogni esercizio della scheda.") {
                     Pila {
                         Interruttore(titolo: "Bip",
                                      sottotitolo: "Anche a schermo bloccato, sopra la musica che si abbassa un attimo",
@@ -122,14 +122,6 @@ struct ImpostazioniView: View {
                         Interruttore(titolo: "Vibrazione", sottotitolo: "Utile con il telefono in silenzioso",
                                      acceso: $vibrazione)
                     }
-                }
-
-                sezione("Recupero", nota: "Puoi cambiarlo anche in sessione, toccando il tempo.") {
-                    SelettoreSegmenti(valori: [RestMode.stopwatch, .countdown], selezione: $modoRecupero,
-                                      etichetta: { $0 == .countdown ? "Conto alla rovescia" : "Cronometro" })
-                    Interruttore(titolo: "Parti da solo a fine recupero",
-                                 sottotitolo: "Solo con il conto alla rovescia: il 3-2-1 parte senza toccare",
-                                 acceso: $partiDaSolo)
                 }
 
                 sezione("Dopo ogni set") {
