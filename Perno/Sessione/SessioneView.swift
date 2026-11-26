@@ -107,7 +107,7 @@ struct SessioneView: View {
                 }
 
                 if case let .countdown(dal, _, _) = sessione.fase {
-                    TimelineView(.animation(minimumInterval: 1.0 / 30)) { contesto in
+                    TimelineView(.animation) { contesto in
                         contoAllaRovescia(ora: contesto.date, dal: dal)
                     }
                 }
@@ -849,7 +849,7 @@ struct SessioneView: View {
             }
 
             if let scadenza = sessione.avviso?.scadenza {
-                TimelineView(.animation(minimumInterval: 0.1)) { contesto in
+                TimelineView(.animation) { contesto in
                     BarraAvviso(restante: NoticeText.remaining(until: scadenza, now: contesto.date))
                 }
                 .padding(.horizontal, 4)
@@ -905,7 +905,7 @@ struct SessioneView: View {
     /// (al posto del cerchio giallo pieno: scelta dell'utente del 24/11, alternativa A).
     /// Numero e anello si leggono da `Countdown` con la stessa data di partenza dei bip.
     private func contoAllaRovescia(ora: Date, dal: Date) -> some View {
-        let restante = Countdown.remaining(at: ora, since: dal)
+        let restante = Countdown.ring(at: ora, since: dal)
         return VStack(spacing: 16) {
             Text(setCorrente(SessionText.countdownTitle))
                 .font(.body.weight(.semibold))

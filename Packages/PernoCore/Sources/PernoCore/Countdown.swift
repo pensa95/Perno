@@ -38,4 +38,21 @@ public enum Countdown {
         let trascorsi = now.timeIntervalSince(start(since: since))
         return min(1, max(0, 1 - trascorsi / TimeInterval(seconds)))
     }
+
+    /// Durata del movimento con cui l'anello consuma un terzo: finisce esattamente sul bip.
+    public static let ringMove: TimeInterval = 0.45
+
+    /// Parte dell'anello ancora piena, **a scatti** (UI v6): piena fino a `start`, poi ogni terzo si consuma con
+    /// un movimento ease-in-out di `ringMove` secondi che arriva sul bip successivo e lì resta fermo:
+    /// 2/3 a start+1, 1/3 a start+2, 0 a start+3 (il «via»). Funzione pura del tempo.
+    public static func ring(at now: Date, since: Date) -> Double {
+        let trascorsi = now.timeIntervalSince(start(since: since))
+        var consumato = 0.0
+        for passo in 1...seconds {
+            let inizio = TimeInterval(passo) - ringMove
+            let avanzamento = min(1, max(0, (trascorsi - inizio) / ringMove))
+            consumato += avanzamento * avanzamento * (3 - 2 * avanzamento) // ease-in-out
+        }
+        return max(0, 1 - consumato / Double(seconds))
+    }
 }

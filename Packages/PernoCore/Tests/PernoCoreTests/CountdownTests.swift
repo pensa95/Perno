@@ -44,4 +44,33 @@ final class CountdownTests: XCTestCase {
         XCTAssertEqual(session.pauses.last?.end, inizia)
         XCTAssertEqual(session.phase, .inSet(since: Countdown.end(since: inizia)))
     }
+
+    func testRingSteps() {
+        let tocco = Date(timeIntervalSince1970: 1_000)
+        let t0 = Countdown.start(since: tocco)
+        func anello(_ dopo: TimeInterval) -> Double { Countdown.ring(at: t0.addingTimeInterval(dopo), since: tocco) }
+        // Pieno fino a t0 (anticipo compreso) e fermo fino all'inizio del primo movimento.
+        XCTAssertEqual(Countdown.ring(at: tocco, since: tocco), 1)
+        XCTAssertEqual(anello(0), 1)
+        XCTAssertEqual(anello(0.5), 1)
+        // Arriva esattamente sul bip e ci resta fermo.
+        XCTAssertEqual(anello(1), 2.0 / 3, accuracy: 0.0001)
+        XCTAssertEqual(anello(1.5), 2.0 / 3, accuracy: 0.0001)
+        XCTAssertEqual(anello(2), 1.0 / 3, accuracy: 0.0001)
+        XCTAssertEqual(anello(2.5), 1.0 / 3, accuracy: 0.0001)
+        XCTAssertEqual(anello(3), 0, accuracy: 0.0001)
+        XCTAssertEqual(anello(4), 0, accuracy: 0.0001)
+        // A metà movimento ha consumato metà del terzo.
+        XCTAssertEqual(anello(1 - Countdown.ringMove / 2), 1 - 0.5 / 3, accuracy: 0.0001)
+    }
+
+    func testRingNeverIncreases() {
+        let tocco = Date(timeIntervalSince1970: 1_000)
+        var prima = 1.0
+        for passo in 0...400 {
+            let valore = Countdown.ring(at: tocco.addingTimeInterval(Double(passo) * 0.01), since: tocco)
+            XCTAssertLessThanOrEqual(valore, prima + 1e-9)
+            prima = valore
+        }
+    }
 }
