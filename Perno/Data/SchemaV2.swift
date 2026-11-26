@@ -3,6 +3,7 @@ import SwiftData
 import PernoCore
 
 // Modello dati della v2 (esercizi a tempo, UI v5). Stesse regole della v1 (vedi `SchemaV1`).
+// La v2 resta com'è: serve alla migrazione dei dati già sul telefono (versione attuale: `SchemaV3`).
 // Novità rispetto alla v1, tutte con un valore predefinito (migrazione leggera):
 // - `RoutineEntry` e `SessionExercise`: `measureRaw` (ripetizioni o tempo), `targetSeconds`, `withWeight`;
 // - `SessionSet`: `targetSeconds` e `seconds` (durata obiettivo e fatta dei set a tempo).
@@ -384,13 +385,3 @@ extension SchemaV2 {
         var duration: TimeInterval { end.timeIntervalSince(start) }
     }
 }
-
-// Nomi usati nel resto dell'app: puntano sempre alla versione corrente dello schema.
-typealias Exercise = SchemaV2.Exercise
-typealias Routine = SchemaV2.Routine
-typealias RoutineEntry = SchemaV2.RoutineEntry
-typealias PlanDay = SchemaV2.PlanDay
-typealias WorkoutSession = SchemaV2.WorkoutSession
-typealias SessionExercise = SchemaV2.SessionExercise
-typealias SessionSet = SchemaV2.SessionSet
-typealias SessionPause = SchemaV2.SessionPause

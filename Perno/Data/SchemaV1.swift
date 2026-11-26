@@ -9,7 +9,7 @@ import PernoCore
 // - la sessione copia i dati della scheda (nome, intervallo, regolazioni): la sessione non
 //   modifica mai la scheda e lo storico non cambia se la scheda cambia.
 // Per cambiare il modello si aggiunge una nuova versione con una tappa in `PernoMigrationPlan`.
-// La v1 resta com'è: serve alla migrazione dei dati già sul telefono (versione attuale: `SchemaV2`).
+// La v1 resta com'è: serve alla migrazione dei dati già sul telefono (versione attuale: `SchemaV3`).
 
 enum SchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)

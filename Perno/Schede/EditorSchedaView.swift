@@ -220,7 +220,8 @@ struct EditorSchedaView: View {
                                      repsMax: originale.repsMax, approachCount: originale.approachCount,
                                      fixedRest: originale.fixedRest, setup: originale.setup, cues: originale.cues,
                                      measure: originale.measure, targetSeconds: originale.targetSeconds,
-                                     withWeight: originale.withWeight)
+                                     withWeight: originale.withWeight, restMode: originale.restMode,
+                                     autoStartAfterRest: originale.autoStartAfterRest)
             context.insert(entry)
             entry.routine = copia
         }
