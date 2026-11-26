@@ -1,4 +1,5 @@
 import SwiftUI
+import PernoCore
 
 // Componenti propri della schermata della sessione (UI v3): piastra del set e dock.
 
@@ -19,6 +20,12 @@ struct PiastraSet: View {
     let stato: Stato
     /// Avvicinamento: tinta calda (UI v6) al posto della grafite.
     var calda = false
+    /// Piastra fatta oltre l'obiettivo: badge «+3» accanto al valore (UI v6).
+    var badge: String? = nil
+    /// Piastra fatta: faccina piccola a destra (UI v6).
+    var faccina: Feeling? = nil
+    /// Nota della piastra da fare: «obiettivo», o «prossimo» durante il recupero.
+    var notaDaFare = "obiettivo"
 
     var body: some View {
         Group {
@@ -28,7 +35,7 @@ struct PiastraSet: View {
             case let .fatta(nota):
                 riga(fatta: true, nota: nota)
             case .daFare:
-                riga(fatta: false, nota: "obiettivo")
+                riga(fatta: false, nota: notaDaFare)
             }
         }
         // Piastre ad altezza fissa (88 e 44 pt, come nelle tavole): il testo cresce fino a xxxLarge.
@@ -95,18 +102,34 @@ struct PiastraSet: View {
                 .frame(minWidth: 52, alignment: .leading)
                 .lineLimit(1)
                 .fixedSize()
-            Text(valore)
-                .font(.piastra(26, peso: fatta ? .semibold : .medium))
-                .monospacedDigit()
-                .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
-            if let nota {
-                Text(nota)
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.inchiostroTenue)
+            HStack(spacing: 8) {
+                Text(valore)
+                    .font(.piastra(26, peso: fatta ? .semibold : .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if fatta, let badge {
+                    Text(badge)
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Color.suInchiostro)
+                        .padding(.horizontal, 6)
+                        .frame(height: 20)
+                        .background(Color.inchiostro, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .fixedSize()
+                }
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                if fatta, let faccina {
+                    Faccina(tipo: faccina, dimensione: 20, colore: .inchiostroTenue)
+                }
+                if let nota {
+                    Text(nota)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Color.inchiostroTenue)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -122,7 +145,67 @@ struct PiastraSet: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(fatta ? "\(nome) fatto, \(valore)" : "\(nome) da fare, obiettivo \(valore)")
+        .accessibilityLabel(fatta
+            ? ([("\(nome) fatto, \(valore)"), badge.map { "\($0) sull'obiettivo" }, faccina?.word]
+                .compactMap { $0 }.joined(separator: ", "))
+            : "\(nome) da fare, \(notaDaFare) \(valore)")
+    }
+}
+
+/// Recupero in corso come piastrina tra il set fatto e il set dopo (UI v6, tavole 5, 5b, 5c): blu, alta 52,
+/// perno, «Recupero» con il tempo del dock, a destra «di solito 2:10» o «fissato a 2:00».
+struct PiastrinaRecupero: View {
+    let tempo: String
+    let nota: String?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Color.perno).frame(width: 26, height: 26)
+                Circle().fill(Color.suPerno).frame(width: 8, height: 8)
+            }
+            .frame(width: 28)
+            HStack(spacing: 10) {
+                Text("Recupero")
+                    .font(.subheadline.weight(.semibold))
+                Text(tempo)
+                    .font(.piastra(30))
+                    .monospacedDigit()
+            }
+            .lineLimit(1)
+            Spacer(minLength: 0)
+            if let nota {
+                Text(nota)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.recuperoTenue)
+                    .lineLimit(1)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
+        .background(Color.recupero, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Recupero in corso, \(tempo)")
+    }
+}
+
+/// Recupero finito tra due set: riga sottile «recupero 2:12» con l'orologio (tempo misurato).
+struct RigaRecupero: View {
+    let testo: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "clock")
+                .font(.system(size: 12, weight: .semibold))
+            Text(testo)
+                .font(.footnote.weight(.medium))
+        }
+        .foregroundStyle(Color.inchiostroTenue)
+        .padding(.leading, 20)
+        .frame(maxWidth: .infinity, minHeight: 24, maxHeight: 24, alignment: .leading)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 
