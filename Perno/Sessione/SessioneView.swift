@@ -505,13 +505,15 @@ struct SessioneView: View {
         }
     }
 
-    /// Card bianca: regolazioni (più grandi durante il cambio esercizio) e promemoria.
+    /// Card bianca: regolazioni (più grandi durante il cambio esercizio) e promemoria; sotto una riga, la nota
+    /// della volta scorsa (UI v6, tavola 2) e quella di oggi («la ritrovi la prossima volta», tavola 13).
     @ViewBuilder
     private func regolazioni(_ esercizio: SessionExercise) -> some View {
         let setup = esercizio.setup.trimmingCharacters(in: .whitespacesAndNewlines)
         let promemoria = Cues.split(esercizio.cues)
-        let nota = esercizio.note
-        if !setup.isEmpty || !promemoria.isEmpty || !nota.isEmpty {
+        let nota = esercizio.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let precedente = esercizio.notaVoltaScorsa
+        if !setup.isEmpty || !promemoria.isEmpty || !nota.isEmpty || precedente != nil {
             let inEvidenza: Bool = {
                 if case .changeover = sessione.fase, sessione.esercizioFinito == nil { return true }
                 return false
@@ -538,16 +540,14 @@ struct SessioneView: View {
                     }
                     .foregroundStyle(Color.inchiostroTenue)
                 }
+                let primaRiga = setup.isEmpty && promemoria.isEmpty
+                if let precedente {
+                    rigaNota(etichetta: ExerciseNoteText.lastTime(precedente.date), testo: precedente.note,
+                             separata: !primaRiga)
+                }
                 if !nota.isEmpty {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Image(systemName: "text.bubble")
-                            .font(.system(size: dimensioneRegolazioni, weight: .semibold))
-                        Text(nota)
-                            .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .foregroundStyle(Color.inchiostroTenue)
-                    .accessibilityLabel("Nota di oggi: \(nota)")
+                    rigaNota(etichetta: ExerciseNoteText.today, testo: nota,
+                             separata: !primaRiga || precedente != nil)
                 }
             }
             .padding(inEvidenza ? 16 : 12)
@@ -555,6 +555,35 @@ struct SessioneView: View {
             .background(Color.foglio, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.top, 16)
         }
+    }
+
+    /// Nota nella card: fumetto, etichetta tenue (13 pt) e testo (15 pt, semibold), separata da una riga sottile.
+    private func rigaNota(etichetta: String, testo: String, separata: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "bubble.left")
+                .font(.system(size: dimensioneRegolazioni, weight: .semibold))
+                .foregroundStyle(Color.inchiostro)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(etichetta)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.inchiostroTenue)
+                Text(testo)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.inchiostro)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, separata ? 10 : 0)
+        .overlay(alignment: .top) {
+            if separata {
+                Rectangle()
+                    .fill(Color.inchiostro.opacity(0.1))
+                    .frame(height: 1)
+            }
+        }
+        .padding(.top, separata ? 2 : 0)
+        .accessibilityElement(children: .combine)
     }
 
     private func piastra(_ set: SessionSet, posizione: Int, esercizio indice: Int) -> some View {
