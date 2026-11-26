@@ -181,6 +181,12 @@ struct ScalettaView: View {
                             .monospacedDigit()
                             .foregroundStyle(Color.inchiostroTenue)
                     }
+                    if sessione.esercizi[indice].addedFromRoutine {
+                        // Aggiunto alla scheda a sessione aperta (T12).
+                        Text("Aggiunto dalla scheda")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Color.recupero)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if modificabile {
