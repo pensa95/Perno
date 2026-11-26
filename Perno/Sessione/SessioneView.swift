@@ -26,6 +26,8 @@ struct SessioneView: View {
     @State private var scalettaAperta = false
     @State private var aggiungiAperto = false
     @State private var sostituisciAperto = false
+    /// Pagina scorsa in cima (serve a «trascina giù per ridurre», T16).
+    @State private var inCima = true
     @State private var scriviNota = false
     @State private var testoNota = ""
 
@@ -47,8 +49,10 @@ struct SessioneView: View {
                               elimina: elimina)
                     .transition(menoMovimento ? .opacity : .move(edge: .trailing))
             } else {
-                schermata
-                    .transition(menoMovimento ? .opacity : .move(edge: .leading))
+                TrascinaPerRidurre(sessione: sessione, inCima: inCima, riduci: riduci) {
+                    schermata
+                }
+                .transition(menoMovimento ? .opacity : .move(edge: .leading))
             }
         }
         .animation(.easeInOut(duration: 0.3), value: sessione.riepilogoAperto)
@@ -81,7 +85,15 @@ struct SessioneView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 16)
+                        .background(alignment: .top) {
+                            GeometryReader { spazio in
+                                Color.clear.preference(key: CimaPagina.self,
+                                                       value: spazio.frame(in: .named("paginaSessione")).minY)
+                            }
+                        }
                     }
+                    .coordinateSpace(name: "paginaSessione")
+                    .onPreferenceChange(CimaPagina.self) { cima in inCima = cima >= -1 }
                     .scrollBounceBehavior(.basedOnSize)
                     TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
                         dock(ora: contesto.date)
@@ -990,5 +1002,151 @@ private struct BarraAvviso: View {
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+/// Posizione del contenuto rispetto alla cima della pagina della sessione (0 = in cima).
+private struct CimaPagina: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// Trascina giù per ridurre (UI v6, tavola 14): con la pagina scorsa in cima, un trascinamento lungo verso il
+/// basso stacca la sessione (angoli arrotondati, maniglia, ombra) e lascia vedere dietro la card della sessione;
+/// oltre la soglia compare «Lascia per ridurre» e lasciando la sessione si riduce, come con la freccia giù.
+/// Sotto la soglia torna al suo posto. Il gesto parte solo se è verso il basso e dalla cima della pagina.
+private struct TrascinaPerRidurre<Contenuto: View>: View {
+    let sessione: SessioneInCorso
+    let inCima: Bool
+    let riduci: () -> Void
+    @ViewBuilder let contenuto: () -> Contenuto
+
+    @State private var spostamento: CGFloat = 0
+    @State private var valido: Bool?
+    @State private var oltre = false
+    private let soglia: CGFloat = 160
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if spostamento > 0 {
+                dietro
+            }
+            contenuto()
+                // Ritaglio a tutto schermo (aree sicure comprese), arrotondato solo mentre si trascina.
+                .mask {
+                    RoundedRectangle(cornerRadius: spostamento > 0 ? 28 : 0, style: .continuous)
+                        .ignoresSafeArea()
+                }
+                .overlay(alignment: .top) {
+                    if spostamento > 0 {
+                        Capsule()
+                            .fill(Color.linea)
+                            .frame(width: 36, height: 5)
+                            .padding(.top, 8)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .shadow(color: Color.ombra.opacity(spostamento > 0 ? 0.25 : 0), radius: 15, x: 0, y: -8)
+                .offset(y: spostamento)
+        }
+        .simultaneousGesture(trascinamento)
+    }
+
+    /// Dietro la sessione staccata: la lamiera, la card della sessione nel colore della fase e, oltre la
+    /// soglia, «Lascia per ridurre».
+    private var dietro: some View {
+        ZStack(alignment: .top) {
+            Color.lamiera.ignoresSafeArea()
+            TimelineView(.periodic(from: .now, by: 1)) { contesto in
+                card(ora: contesto.date)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            if oltre {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Lascia per ridurre")
+                        .font(.footnote.weight(.semibold))
+                }
+                .foregroundStyle(Color.suInchiostro)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(Color.inchiostro, in: Capsule())
+                .padding(.top, max(140, spostamento - 34))
+                .transition(.opacity)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func card(ora: Date) -> some View {
+        let (etichetta, fondo, chiaro) = fase
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(etichetta)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(chiaro ? Color.inchiostroTenue : Color.white.opacity(0.8))
+                Spacer()
+                Text(SessionText.clock(ora.timeIntervalSince(sessione.sessione.startedAt)))
+                    .font(.piastra(20))
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 0)
+            Text(sessione.esercizioCorrente?.name ?? sessione.sessione.titolo)
+                .font(.piastra(34))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .foregroundStyle(chiaro ? Color.inchiostro : Color.white)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 120, alignment: .leading)
+        .background(fondo, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    /// Etichetta e colore della fase, come il dock (`chiaro`: fondo foglio con il testo inchiostro).
+    private var fase: (String, Color, Bool) {
+        switch sessione.fase {
+        case .warmUp: return ("Riscaldamento", .riscaldamento, false)
+        case .changeover: return ("Cambio esercizio", .piastra, false)
+        case .countdown: return ("3-2-1", .piastra, false)
+        case .inSet: return ("Set in corso", .foglio, true)
+        case .rest: return ("Recupero", .recupero, false)
+        case .finished: return ("Tutti i set fatti", .piastra, false)
+        }
+    }
+
+    private var trascinamento: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { valore in
+                if valido == nil {
+                    valido = inCima && valore.translation.height > 0
+                        && abs(valore.translation.height) > abs(valore.translation.width)
+                }
+                guard valido == true else { return }
+                spostamento = max(0, valore.translation.height)
+                let passata = spostamento > soglia
+                if passata != oltre {
+                    withAnimation(.easeOut(duration: 0.15)) { oltre = passata }
+                    if passata { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                }
+            }
+            .onEnded { _ in
+                defer { valido = nil }
+                guard valido == true else { return }
+                if oltre {
+                    riduci()
+                    // La schermata si chiude: riparte da zero alla prossima apertura.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        spostamento = 0
+                        oltre = false
+                    }
+                } else {
+                    withAnimation(.snappy) {
+                        spostamento = 0
+                        oltre = false
+                    }
+                }
+            }
     }
 }
