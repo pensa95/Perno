@@ -29,7 +29,8 @@ struct ScalettaView: View {
             .padding(.bottom, 8)
 
             List {
-                ForEach(scaletta.done, id: \.self) { indice in
+                // Un esercizio sostituito prima di fare set resta senza set: non si mostra.
+                ForEach(scaletta.done.filter { !sessione.set[$0].isEmpty }, id: \.self) { indice in
                     fatto(indice).riga(sopra: 2, sotto: 2)
                 }
                 if let corrente = scaletta.current {

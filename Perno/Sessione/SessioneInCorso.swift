@@ -455,6 +455,70 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
+    // MARK: Sostituisci (UI v6)
+
+    /// «Sostituisci» si può usare sull'esercizio: ha set da fare e nessun suo set è in corso.
+    func puoSostituire(_ indice: Int) -> Bool {
+        macchina.canReplace(exercise: indice)
+    }
+
+    /// «Sostituisci» (tavola 12), solo per oggi: i set fatti restano sul vecchio, quelli da fare passano al
+    /// nuovo (stesso numero di set di lavoro, gli avvicinamenti no) con gli obiettivi dalla sua ultima volta.
+    /// Il nuovo entra subito dopo il vecchio nell'ordine di oggi. La scheda non cambia: il vecchio tiene il
+    /// legame con la scheda, il nuovo non ce l'ha.
+    func sostituisci(_ indice: Int, con nuovo: Exercise, alle ora: Date = .now) {
+        guard puoSostituire(indice) else { return }
+        let vecchio = esercizi[indice]
+        let daFare = set[indice].indices.filter { !macchina.isDone(exercise: indice, set: $0) }
+        let lavoro = max(1, daFare.filter { set[indice][$0].kind != .approach }.count)
+        let piano = SessionPlanner.plan(workSets: lavoro, repsMin: vecchio.repsMin, repsMax: vecchio.repsMax,
+                                        approaches: 0, history: WorkoutSession.storiaSetDiLavoro(nuovo),
+                                        step: PlateStep.current)
+        let nuovoIndice: Int
+        do {
+            nuovoIndice = try macchina.replaceExercise(indice, with: PlannedExercise(name: nuovo.name, sets: piano),
+                                                       at: ora)
+        } catch {
+            return
+        }
+        // Il vecchio tiene solo i set fatti.
+        for posizione in daFare.reversed() {
+            context.delete(set[indice].remove(at: posizione))
+        }
+        for (posizione, rimasto) in set[indice].enumerated() {
+            rimasto.position = posizione
+        }
+        let registrato = SessionExercise(position: esercizi.count, exercise: nuovo, name: nuovo.name,
+                                         repsMin: vecchio.repsMin, repsMax: vecchio.repsMax)
+        registrato.restModeRaw = vecchio.restModeRaw
+        registrato.autoStartAfterRest = vecchio.autoStartAfterRest
+        context.insert(registrato)
+        registrato.session = sessione
+        var nuoviSet: [SessionSet] = []
+        for (posizione, pianificato) in piano.enumerated() {
+            let nuovoSet = SessionSet(position: posizione, kind: pianificato.kind,
+                                      targetWeight: pianificato.weight, targetReps: pianificato.reps)
+            context.insert(nuovoSet)
+            nuovoSet.sessionExercise = registrato
+            nuoviSet.append(nuovoSet)
+        }
+        esercizi.append(registrato)
+        set.append(nuoviSet)
+        prima.append(WorkoutSession.ultimiSetDiLavoro(nuovo))
+        primaATempo.append([])
+        assert(esercizi.count - 1 == nuovoIndice)
+        for (posizione, voce) in macchina.order.enumerated() {
+            esercizi[voce].position = posizione
+        }
+        // Un vecchio rimasto senza set è fuori dall'ordine di oggi: va in fondo.
+        if !macchina.order.contains(indice) {
+            vecchio.position = macchina.order.count + indice
+        }
+        sessione.lastActivityAt = ora
+        aggiornaRecuperoAbituale()
+        try? context.save()
+    }
+
     // MARK: Menu «…» dell'esercizio
 
     /// «Aggiungi set»: un set di lavoro in più in fondo all'esercizio di adesso.
