@@ -46,16 +46,18 @@ public enum Progression {
     /// Scarico dopo due volte sotto il minimo: peso di lavoro al 90%, arrotondato al passo dei dischi.
     public static let deloadFactor = 0.9
 
-    /// Set di lavoro fatto (peso in chili) con l'eventuale riserva (0…4).
+    /// Set di lavoro fatto (peso in chili) con la faccina (UI v6) o, nei dati vecchi, la riserva (0…4).
     public struct WorkSet: Equatable, Sendable {
         public var weight: Double
         public var reps: Int
         public var reserve: Int?
+        public var feeling: Feeling?
 
-        public init(weight: Double, reps: Int, reserve: Int? = nil) {
+        public init(weight: Double, reps: Int, reserve: Int? = nil, feeling: Feeling? = nil) {
             self.weight = weight
             self.reps = reps
             self.reserve = reserve
+            self.feeling = feeling
         }
     }
 
@@ -68,6 +70,8 @@ public enum Progression {
         case increase(to: Double)
         /// Al massimo dell'intervallo ma con riserva 0 su tutti i set: si mantiene.
         case holdNoReserve
+        /// Al massimo dell'intervallo ma con un set faticoso, o meno della metà leggeri: si mantiene (UI v6).
+        case holdFeeling
         /// Sotto il minimo per la seconda volta di fila: scarico, si riparte dal minimo.
         case deload(to: Double)
     }
@@ -75,7 +79,10 @@ public enum Progression {
     /// Regole (funzionalità, sezione 6):
     /// - tutti i set di lavoro dell'ultima volta (almeno quanti quelli di oggi) al peso più alto e al
     ///   massimo dell'intervallo → + passo dei dischi e ripetizioni dal minimo;
-    /// - … ma con riserva 0 su tutti i set (data per tutti) → si mantiene;
+    /// - … con le faccine (UI v6, se l'ultima volta ce n'è almeno una): si aumenta solo se nessun set è
+    ///   faticoso e almeno metà dei set sono leggeri, altrimenti si mantiene. Si guardano tutti i set di lavoro
+    ///   insieme, non il singolo set;
+    /// - … senza faccine (dati vecchi) con riserva 0 su tutti i set (data per tutti) → si mantiene;
     /// - almeno un set sotto il minimo l'ultima volta e anche quella prima → scarico al 90%;
     ///   una volta sola → si mantiene;
     /// - altrimenti si ripete l'ultima volta.
@@ -91,6 +98,12 @@ public enum Progression {
         let allAtMax = last.count >= max(workSets, 1)
             && last.allSatisfy { $0.weight >= top - 0.001 && $0.reps >= repsMax }
         if allAtMax {
+            let feelings = last.map(\.feeling)
+            if feelings.contains(where: { $0 != nil }) {
+                let light = feelings.filter { $0 == .light }.count
+                let anyHard = feelings.contains(.hard)
+                return !anyHard && light * 2 >= last.count ? .increase(to: top + step) : .holdFeeling
+            }
             let reserves = last.map(\.reserve)
             if reserves.allSatisfy({ $0 == 0 }) { return .holdNoReserve }
             return .increase(to: top + step)
@@ -116,7 +129,7 @@ extension SessionPlanner {
                                           repsMax: repsMax, step: step)
         let newWeight: Double
         switch decision {
-        case .firstTime, .repeatLast, .holdNoReserve:
+        case .firstTime, .repeatLast, .holdNoReserve, .holdFeeling:
             return plan(workSets: workSets, repsMin: repsMin, approaches: approaches, previous: previous, step: step)
         case let .increase(to), let .deload(to):
             newWeight = to

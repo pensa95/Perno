@@ -1,11 +1,11 @@
 import SwiftUI
 import PernoCore
 
-/// Correggi set (tavola 8): peso e ripetizioni in due blocchi grandi con −/+ (tocco sul numero =
-/// tastierino), «Altri dettagli» chiuso con tipo di set e riserva, «Salva» giallo, «Elimina set» rosso.
-/// La X chiude senza salvare. Su un set da fare (anche quello di adesso) cambia l'obiettivo:
-/// niente riserva né «Elimina set». Set a tempo (UI v5): peso (solo con «Con peso») e durata,
-/// a passi di 5 s; niente riserva.
+/// Correggi set (tavola 10, UI v6): peso e ripetizioni in due blocchi grandi con −/+ (tocco sul numero =
+/// tastierino), «Com'è andato?» con le faccine (solo set di lavoro fatti, anche a tempo), «Tipo di set»
+/// che si apre al tocco, «Salva» giallo, «Elimina set» rosso. La X chiude senza salvare. Su un set da fare
+/// (anche quello di adesso) cambia l'obiettivo: niente faccine né «Elimina set». Set a tempo (UI v5): peso
+/// (solo con «Con peso») e durata, a passi di 5 s.
 struct CorreggiSetView: View {
     let sessione: SessioneInCorso
     let esercizio: Int
@@ -15,7 +15,7 @@ struct CorreggiSetView: View {
     @State private var peso: Double
     @State private var ripetizioni: Int
     @State private var tipo: SetKind
-    @State private var riserva: Reserve?
+    @State private var faccina: Feeling?
     @State private var altriDettagli = false
     @State private var scriviPeso = false
     @State private var scriviRipetizioni = false
@@ -34,7 +34,7 @@ struct CorreggiSetView: View {
         _peso = State(initialValue: set.weight ?? set.targetWeight)
         _ripetizioni = State(initialValue: set.reps ?? set.targetReps)
         _tipo = State(initialValue: set.kind)
-        _riserva = State(initialValue: set.reserve)
+        _faccina = State(initialValue: set.feeling)
         _secondi = State(initialValue: set.seconds ?? sessione.obiettivoSecondi(set))
     }
 
@@ -121,7 +121,7 @@ struct CorreggiSetView: View {
 
             PulsanteGiallo(titolo: "Salva") {
                 sessione.correggi(esercizio: esercizio, set: indice, peso: peso, ripetizioni: ripetizioni,
-                                  tipo: tipo, riserva: aTempo ? nil : riserva, secondi: aTempo ? secondi : nil)
+                                  tipo: tipo, faccina: faccina, secondi: aTempo ? secondi : nil)
                 dismiss()
             }
             if fatto {
@@ -223,19 +223,26 @@ struct CorreggiSetView: View {
         .accessibilityLabel(etichetta)
     }
 
-    // MARK: Altri dettagli
+    // MARK: Com'è andato? e Tipo di set
 
     private var dettagli: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // «Com'è andato?» sopra «Tipo di set» (tavola 10): solo set di lavoro già fatti.
+            if fatto && tipo != .approach {
+                SceltaFaccina(scelta: faccina) { scelta in
+                    faccina = faccina == scelta ? nil : scelta
+                }
+                .padding(.bottom, 8)
+            }
             Button {
                 withAnimation(.snappy) { altriDettagli.toggle() }
             } label: {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Altri dettagli")
+                        Text("Tipo di set")
                             .font(.body.weight(.semibold))
                             .foregroundStyle(Color.inchiostro)
-                        Text(SetCorrection.details(kind: tipo, reserve: fatto && !aTempo ? riserva : nil))
+                        Text(SetCorrection.details(kind: tipo, reserve: nil))
                             .font(.footnote)
                             .foregroundStyle(Color.inchiostroTenue)
                     }
@@ -251,21 +258,10 @@ struct CorreggiSetView: View {
             .accessibilityAddTraits(altriDettagli ? .isSelected : [])
 
             if altriDettagli {
-                EtichettaSezione("Tipo di set")
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), spacing: 6) {
                     ForEach(SetKind.allCases, id: \.self) { valore in
                         Scelta(titolo: valore.label, scelta: valore == tipo, altezza: 44, riempi: true) {
                             tipo = valore
-                        }
-                    }
-                }
-                if fatto && !aTempo {
-                    EtichettaSezione("Quante ne avevi ancora?")
-                    HStack(spacing: 6) {
-                        ForEach(Reserve.allCases, id: \.self) { valore in
-                            Scelta(titolo: valore.label, scelta: valore == riserva, altezza: 44, riempi: true) {
-                                riserva = riserva == valore ? nil : valore
-                            }
                         }
                     }
                 }

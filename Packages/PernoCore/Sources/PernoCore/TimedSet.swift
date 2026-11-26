@@ -60,8 +60,8 @@ public enum TimedText {
     /// Riga sotto l'avviso: chiuso a zero o prima.
     public static func noticeDetail(seconds: Int, target: Int) -> String {
         seconds >= target
-            ? "A zero il set si chiude da solo."
-            : "Chiuso prima dello zero: salvato il tempo fatto. −/+ di 5 s."
+            ? "Arrivato a zero: il set si chiude da solo."
+            : "Chiuso prima: salvato il tempo fatto."
     }
 
     /// Nota sulla piastra fatta: «pieno» se arrivato a zero, altrimenti «di 0:45».

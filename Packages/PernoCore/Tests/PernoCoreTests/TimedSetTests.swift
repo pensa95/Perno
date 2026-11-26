@@ -48,9 +48,9 @@ final class TimedSetTests: XCTestCase {
     func testNotice() {
         XCTAssertEqual(TimedText.noticeTitle(.work, 1, weight: 10), "Set 1, 10 ×")
         XCTAssertEqual(TimedText.noticeTitle(.work, 2, weight: nil), "Set 2")
-        XCTAssertEqual(TimedText.noticeDetail(seconds: 45, target: 45), "A zero il set si chiude da solo.")
+        XCTAssertEqual(TimedText.noticeDetail(seconds: 45, target: 45), "Arrivato a zero: il set si chiude da solo.")
         XCTAssertEqual(TimedText.noticeDetail(seconds: 38, target: 45),
-                       "Chiuso prima dello zero: salvato il tempo fatto. −/+ di 5 s.")
+                       "Chiuso prima: salvato il tempo fatto.")
         XCTAssertEqual(TimedText.doneNote(seconds: 45, target: 45), "pieno")
         XCTAssertEqual(TimedText.doneNote(seconds: 38, target: 45), "di 0:45")
     }

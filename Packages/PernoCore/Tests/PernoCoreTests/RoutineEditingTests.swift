@@ -36,7 +36,7 @@ final class RoutineEditingTests: XCTestCase {
         XCTAssertEqual(EntryHints.approach(count: 2), "Al 50% e al 75% del peso di lavoro di oggi.")
         XCTAssertEqual(EntryHints.approach(count: 3), "Al 40%, al 60% e all'80% del peso di lavoro di oggi.")
         XCTAssertEqual(EntryHints.progression(repsMax: 12, step: 2.5),
-                       "Quando arrivi a 12 in tutti i set, la volta dopo l'app propone +2,5 kg.")
+                       "Quando arrivi a 12 in tutti i set e nessuno è faticoso, la volta dopo l'app propone +2,5 kg.")
     }
 
     func testPlanDaysAndEditorLine() {

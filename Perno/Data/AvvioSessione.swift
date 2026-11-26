@@ -52,7 +52,7 @@ extension WorkoutSession {
         return sessione
     }
 
-    /// Set di lavoro fatti nelle ultime volte (dalla più recente), con la riserva: servono ai
+    /// Set di lavoro fatti nelle ultime volte (dalla più recente), con faccina e riserva: servono ai
     /// suggerimenti (`Progression`). Solo sessioni chiuse; le volte senza set fatti non contano.
     static func storiaSetDiLavoro(_ esercizio: Exercise, volte: Int = 2) -> [[Progression.WorkSet]] {
         esercizio.sessionExercises
@@ -62,7 +62,8 @@ extension WorkoutSession {
                 voce.orderedSets.compactMap { set -> Progression.WorkSet? in
                     guard set.kind != .approach, set.isDone, set.targetSeconds == nil,
                           let weight = set.weight, let reps = set.reps else { return nil }
-                    return Progression.WorkSet(weight: weight, reps: reps, reserve: set.reserveRaw)
+                    return Progression.WorkSet(weight: weight, reps: reps, reserve: set.reserveRaw,
+                                               feeling: set.feeling)
                 }
             }
             .filter { !$0.isEmpty }
