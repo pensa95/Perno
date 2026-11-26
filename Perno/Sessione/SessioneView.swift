@@ -236,7 +236,7 @@ struct SessioneView: View {
         case .warmUp:
             testo = "Riscaldamento in corso"
         case .changeover:
-            if let indice = sessione.indiceEsercizio, indice < sessione.esercizi.count {
+            if let indice = sessione.macchina.currentExerciseIndex, indice < sessione.esercizi.count {
                 testo = "Cambio esercizio. Prossimo: \(sessione.esercizi[indice].name)"
             } else {
                 testo = "Cambio esercizio"
@@ -372,7 +372,8 @@ struct SessioneView: View {
             VStack(spacing: 4) {
                 ForEach(Array(sessione.set[indice].enumerated()), id: \.offset) { posizione, set in
                     Group {
-                        if posizione == sessione.macchina.setIndex {
+                        if posizione == sessione.macchina.setIndex,
+                           indice == sessione.macchina.currentExerciseIndex {
                             recuperoPrima(esercizio: esercizio)
                         }
                         Button {
@@ -473,7 +474,7 @@ struct SessioneView: View {
         let nota = esercizio.note
         if !setup.isEmpty || !promemoria.isEmpty || !nota.isEmpty {
             let inEvidenza: Bool = {
-                if case .changeover = sessione.fase { return true }
+                if case .changeover = sessione.fase, sessione.esercizioFinito == nil { return true }
                 return false
             }()
             VStack(alignment: .leading, spacing: 8) {
@@ -538,8 +539,9 @@ struct SessioneView: View {
         }
 
         let obiettivo = SessionText.weightReps(set.targetWeight, set.targetReps)
-        guard posizione == sessione.macchina.setIndex, !inRecupero else {
-            let prossimo = posizione == sessione.macchina.setIndex
+        let diAdesso = posizione == sessione.macchina.setIndex && indice == sessione.macchina.currentExerciseIndex
+        guard diAdesso, !inRecupero else {
+            let prossimo = diAdesso
             return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare, calda: calda,
                               notaDaFare: prossimo ? PlateText.next : "obiettivo")
         }
@@ -572,8 +574,9 @@ struct SessioneView: View {
                               faccina: set.feeling)
         }
         let valore = TimedText.value(seconds: obiettivo, weight: sessione.pesoATempo(indice, set.targetWeight))
-        guard posizione == sessione.macchina.setIndex, !inRecupero else {
-            let prossimo = posizione == sessione.macchina.setIndex
+        let diAdesso = posizione == sessione.macchina.setIndex && indice == sessione.macchina.currentExerciseIndex
+        guard diAdesso, !inRecupero else {
+            let prossimo = diAdesso
             return PiastraSet(nome: nome, valore: valore, stato: .daFare,
                               notaDaFare: prossimo ? PlateText.next : "obiettivo")
         }
@@ -601,6 +604,20 @@ struct SessioneView: View {
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
                 secondario: DockSessione.Secondario(titolo: "Salta") { sessione.riscaldamentoFatto() },
                 principale: DockSessione.Pulsante(titolo: "Riscaldamento fatto") { sessione.riscaldamentoFatto() })
+        case let .changeover(dal) where sessione.esercizioFinito != nil:
+            // Fine dell'ultimo set di un esercizio (tavola 6): si resta qui, «Vai a …» apre il cambio.
+            let prossimo = sessione.macchina.currentExerciseIndex.map { sessione.esercizi[$0] }
+            let nome = prossimo?.name ?? ""
+            DockSessione(
+                sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,
+                etichetta: "Cambio esercizio",
+                tempo: SessionText.clock(ora.timeIntervalSince(dal)),
+                principale: DockSessione.Pulsante(titolo: NextExerciseText.goTo(nome)) {
+                    sessione.vaiAlProssimo()
+                },
+                sottotitolo: sessione.macchina.currentExerciseIndex.map {
+                    NextExerciseText.subtitle(exercise: nome, detail: sessione.dettaglioProssimo($0))
+                })
         case let .changeover(dal):
             DockSessione(
                 sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,
@@ -761,7 +778,7 @@ struct SessioneView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { sessione.toccaAvviso() }
-        .modifier(StileAvviso(schema: schema))
+        .modifier(StileAvviso(schema: schema, inFondo: sessione.fase == .finished))
     }
 
     /// Riga centrale dell'avviso: − da 64, valore a 48 con lo scarto sotto, + da 64.
@@ -848,6 +865,8 @@ struct SessioneView: View {
 /// angoli da 24, ombra; testo fino a xxxLarge così le righe non escono mai dai bordi.
 private struct StileAvviso: ViewModifier {
     let schema: ColorScheme
+    /// Fine sessione (tavola 7): senza dock l'avviso scende in fondo.
+    var inFondo = false
 
     func body(content: Content) -> some View {
         content
@@ -866,7 +885,7 @@ private struct StileAvviso: ViewModifier {
             .shadow(color: Color.ombra.opacity(schema == .dark ? 0.5 : 0.24), radius: 16, x: 0, y: 12)
             .shadow(color: Color.ombra.opacity(0.16), radius: 4, x: 0, y: 2)
             .padding(.horizontal, 12)
-            .padding(.bottom, 236)
+            .padding(.bottom, inFondo ? 40 : 236)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .ignoresSafeArea(edges: .bottom)
             .transition(.opacity)

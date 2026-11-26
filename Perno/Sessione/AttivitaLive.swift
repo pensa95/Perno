@@ -138,6 +138,8 @@ final class AttivitaLive {
             sessione.rimanda()
         case .addFifteen:
             sessione.aggiungiQuindiciSecondi()
+        case .goToNext:
+            sessione.vaiAlProssimo()
         case .open:
             break
         }
@@ -224,8 +226,19 @@ extension SessioneInCorso {
             workSetsDone: totali.fatti,
             workSetsTotal: totali.totale,
             targetSeconds: indice.flatMap { aTempo($0) ? corrente.map(obiettivoSecondi) : nil },
-            withWeight: esercizio?.withWeight ?? true
+            withWeight: esercizio?.withWeight ?? true,
+            awaitingNext: esercizioFinito != nil,
+            nextDetail: indice.map(dettaglioProssimo)
         )
+    }
+
+    /// «3 set da 8 a 12» (a tempo «3 set da 0:45») dell'esercizio `indice`.
+    func dettaglioProssimo(_ indice: Int) -> String {
+        let esercizio = esercizi[indice]
+        let lavoro = set[indice].filter { $0.kind != .approach }
+        return NextExerciseText.detail(sets: lavoro.count, repsMin: esercizio.repsMin, repsMax: esercizio.repsMax,
+                                       seconds: esercizio.isTimed
+                                           ? (lavoro.first.map(obiettivoSecondi) ?? esercizio.targetSeconds) : nil)
     }
 }
 
