@@ -11,7 +11,8 @@ enum Impostazioni {
     /// Stessa chiave usata in sessione quando si tocca il tempo del recupero.
     static let modoRecupero = "recupero.modo"
     static let partiDaSolo = "impostazioni.partiDaSolo"
-    static let chiediRiserva = "impostazioni.chiediRiserva"
+    /// «Chiedi com'è andato» (UI v6; stessa chiave della vecchia «Chiedi quante ne avevi ancora»).
+    static let chiediFaccina = "impostazioni.chiediRiserva"
     static let unita = "impostazioni.unita"
     static let passo = "impostazioni.passo"
 
@@ -29,7 +30,7 @@ enum Impostazioni {
             vibrazione: true,
             modoRecupero: RestMode.stopwatch.rawValue,
             partiDaSolo: false,
-            chiediRiserva: true,
+            chiediFaccina: true,
             unita: WeightUnit.kilograms.rawValue,
             passo: PlateStep.standard,
         ])
@@ -88,7 +89,7 @@ struct ImpostazioniView: View {
     @AppStorage(Impostazioni.vibrazione) private var vibrazione = true
     @AppStorage(Impostazioni.modoRecupero) private var modoRecupero: RestMode = .stopwatch
     @AppStorage(Impostazioni.partiDaSolo) private var partiDaSolo = false
-    @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
+    @AppStorage(Impostazioni.chiediFaccina) private var chiediFaccina = true
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
     @AppStorage(Impostazioni.passo) private var passo = PlateStep.standard
 
@@ -132,9 +133,9 @@ struct ImpostazioniView: View {
                 }
 
                 sezione("Dopo ogni set") {
-                    Interruttore(titolo: "Chiedi quante ne avevi ancora",
-                                 sottotitolo: "Da 0 (non ne facevo un'altra) a 4+. Serve a capire quando aumentare il peso",
-                                 acceso: $chiediRiserva)
+                    Interruttore(titolo: "Chiedi com'è andato",
+                                 sottotitolo: "Leggero, giusto o faticoso. Serve a capire quando aumentare il peso",
+                                 acceso: $chiediFaccina)
                 }
 
                 sezione("Dati") {

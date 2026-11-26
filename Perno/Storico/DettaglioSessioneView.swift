@@ -189,20 +189,27 @@ struct DettaglioSessioneView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Set fatto: fondo chiaro pieno, «62,5 × 9» e «riserva 1». Non fatto: solo bordo, numeri tenui e «non fatto».
+    /// Set fatto: fondo chiaro pieno, «62,5 × 9» e sotto la faccina con la parola («giusto», UI v6) o, nei
+    /// dati vecchi, «riserva 1». Non fatto: solo bordo, numeri tenui e «non fatto».
     private func piastrina(_ set: SessionSet) -> some View {
         let fatto = set.isDone
         let testo = set.testoValore
-        let sotto = fatto ? SessionDetailText.reserve(set.reserve) : SessionDetailText.notDone
+        let faccina = fatto ? set.feeling : nil
+        let sotto = fatto ? (faccina?.word ?? SessionDetailText.reserve(set.reserve)) : SessionDetailText.notDone
         return VStack(alignment: .leading, spacing: 0) {
             Text(testo)
                 .font(.piastra(20))
                 .monospacedDigit()
                 .foregroundStyle(fatto ? Color.inchiostro : Color.inchiostroTenue)
             if let sotto {
-                Text(sotto)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.inchiostroTenue)
+                HStack(spacing: 4) {
+                    if let faccina {
+                        Faccina(tipo: faccina, dimensione: 14, colore: .inchiostroTenue)
+                    }
+                    Text(sotto)
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.inchiostroTenue)
             }
         }
         .padding(.horizontal, 8)

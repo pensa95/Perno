@@ -24,8 +24,8 @@ final class SessioneInCorso: Identifiable {
     private(set) var recuperoAbituale: TimeInterval? = nil
     /// Avviso dopo «Set fatto» (ripetizioni, riserva, Annulla); `nil` quando è chiuso.
     private(set) var avviso: Avviso? = nil
-    /// Secondi in cui l'avviso resta aperto; ogni tocco li rinnova.
-    static let durataAvviso: TimeInterval = 5
+    /// Secondi in cui l'avviso resta aperto (10 dalla UI v6); ogni tocco li rinnova.
+    static let durataAvviso: TimeInterval = NoticeText.duration
 
     /// Recupero in cronometro o alla rovescia: l'ultima scelta resta (anche tra le sessioni).
     var modoRecupero: RestMode {
@@ -238,7 +238,7 @@ final class SessioneInCorso: Identifiable {
     /// (anche quello di adesso) cambia l'obiettivo. I set dopo con lo stesso obiettivo prendono il
     /// peso nuovo (e, dal primo set di lavoro, anche gli avvicinamenti da fare).
     func correggi(esercizio: Int, set indice: Int, peso: Double, ripetizioni: Int,
-                  tipo: SetKind, riserva: Reserve?, secondi: Int? = nil, alle ora: Date = .now) {
+                  tipo: SetKind, faccina: Feeling?, secondi: Int? = nil, alle ora: Date = .now) {
         let registrato = set[esercizio][indice]
         if let secondi {
             // A tempo: durata fatta su un set fatto, durata obiettivo su un set da fare.
@@ -264,7 +264,8 @@ final class SessioneInCorso: Identifiable {
             registrato.weight = fatto.weight
             registrato.reps = fatto.reps
             registrato.kind = fatto.kind
-            registrato.reserve = riserva
+            // Faccina solo sui set di lavoro; la riserva dei dati vecchi resta com'è.
+            registrato.feeling = fatto.kind == .approach ? nil : faccina
         }
         for cambiato in cambiati {
             let piano = macchina.exercises[esercizio].sets[cambiato]
@@ -288,6 +289,7 @@ final class SessioneInCorso: Identifiable {
         registrato.weight = nil
         registrato.reps = nil
         registrato.reserve = nil
+        registrato.feeling = nil
         registrato.startedAt = nil
         registrato.endedAt = nil
         registrato.seconds = nil
@@ -318,10 +320,15 @@ final class SessioneInCorso: Identifiable {
         rinnovaAvviso(ora)
     }
 
-    /// «Quante ne avevi ancora?»: un secondo tocco sullo stesso valore lo toglie.
-    func scegliRiserva(_ riserva: Reserve, alle ora: Date = .now) {
+    /// «Com'è andato?» (UI v6): un secondo tocco sulla stessa faccina la toglie.
+    func scegliFaccina(_ faccina: Feeling, alle ora: Date = .now) {
         guard let registrato = setDellAvviso else { return }
-        registrato.reserve = registrato.reserve == riserva ? nil : riserva
+        registrato.feeling = registrato.feeling == faccina ? nil : faccina
+        rinnovaAvviso(ora)
+    }
+
+    /// Tocco sull'avviso fuori dai pulsanti: rinnova i 10 secondi.
+    func toccaAvviso(alle ora: Date = .now) {
         rinnovaAvviso(ora)
     }
 
@@ -336,6 +343,7 @@ final class SessioneInCorso: Identifiable {
         registrato.weight = nil
         registrato.reps = nil
         registrato.reserve = nil
+        registrato.feeling = nil
         registrato.startedAt = nil
         registrato.endedAt = nil
         registrato.seconds = nil

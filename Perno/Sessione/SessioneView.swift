@@ -19,7 +19,7 @@ struct SessioneView: View {
     @State private var progressi: Exercise?
     @Environment(\.colorScheme) private var schema
     @Environment(\.accessibilityReduceMotion) private var menoMovimento
-    @AppStorage(Impostazioni.chiediRiserva) private var chiediRiserva = true
+    @AppStorage(Impostazioni.chiediFaccina) private var chiediFaccina = true
     /// Regolazioni (15 pt, 18 pt in evidenza) e icone accanto: crescono con «Testo più grande».
     @ScaledMetric(relativeTo: .subheadline) private var dimensioneRegolazioni: CGFloat = 15
     @ScaledMetric(relativeTo: .title3) private var dimensioneRegolazioniEvidenza: CGFloat = 18
@@ -634,141 +634,120 @@ struct SessioneView: View {
 
     // MARK: Avviso dopo «Set fatto»
 
-    /// Sopra il dock: spunta, «Set 1, 62,5 ×», −/+ sulle ripetizioni, «Annulla» e la riserva.
-    @ViewBuilder
+    /// Avviso dopo «Set fatto» (UI v6, tavole 5, 6, 7 e 16): tre righe che non escono mai dai bordi e non
+    /// scorrono in orizzontale. «Set N fatto, 65 kg» con «Annulla»; ripetizioni (o durata) grandi al centro con
+    /// − e + da 64 e lo scarto sull'obiettivo sotto; «Com'è andato?» con le faccine (solo set di lavoro, se
+    /// l'impostazione è accesa). In fondo la barretta del tempo rimasto: 10 s, ogni tocco li rinnova.
     private func avvisoSetFatto(_ set: SessionSet) -> some View {
-        if sessione.aTempo(sessione.avviso?.esercizio ?? 0) {
-            avvisoSetATempo(set)
-        } else {
-            avvisoSetARipetizioni(set)
-        }
-    }
-
-    /// Avviso di un set a tempo (UI v5): «Set 1, 10 ×», −/+ di 5 s sulla durata, «Annulla»; niente riserva.
-    private func avvisoSetATempo(_ set: SessionSet) -> some View {
         let indice = sessione.avviso?.esercizio ?? 0
         let numeri = SessionText.numbers(sessione.set[indice].map(\.kind))
         let numero = numeri[safe: sessione.avviso?.set ?? 0] ?? 1
-        let obiettivo = sessione.obiettivoSecondi(set)
-        let secondi = set.seconds ?? obiettivo
-        return VStack(alignment: .leading, spacing: 8) {
+        let aTempo = sessione.aTempo(indice)
+        let peso: Double? = aTempo
+            ? sessione.pesoATempo(indice, set.weight ?? set.targetWeight)
+            : (set.weight ?? set.targetWeight)
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 15, weight: .bold))
-                Text(TimedText.noticeTitle(set.kind, numero,
-                                           weight: sessione.pesoATempo(indice, set.weight ?? set.targetWeight)))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 17, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(NoticeText.title(set.kind, numero, weight: peso))
+                    .font(.body.weight(.semibold))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 2) {
-                    tastoRipetizioni("minus", etichetta: "Cinque secondi in meno",
-                                     attivo: secondi > DurationLimits.range.lowerBound) {
-                        sessione.cambiaSecondi(di: -1)
-                    }
-                    Text(Clock.text(Double(secondi)))
-                        .font(.piastra(24))
-                        .monospacedDigit()
-                        .frame(minWidth: 44)
-                    tastoRipetizioni("plus", etichetta: "Cinque secondi in più",
-                                     attivo: secondi < DurationLimits.range.upperBound) {
-                        sessione.cambiaSecondi(di: 1)
-                    }
-                }
-                .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Button {
                     sessione.annullaSetFatto()
                 } label: {
                     Text("Annulla")
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .frame(height: 40)
+                        .lineLimit(1)
+                        .padding(.horizontal, 16)
+                        .frame(height: 44)
                         .background(Color.lamiera, in: Capsule())
                 }
                 .buttonStyle(.plain)
+                .fixedSize()
             }
-            Text(TimedText.noticeDetail(seconds: secondi, target: obiettivo))
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Color.inchiostroTenue)
-                .padding(.trailing, 8)
+            .padding(.leading, 4)
+
+            if aTempo {
+                let obiettivo = sessione.obiettivoSecondi(set)
+                let secondi = set.seconds ?? obiettivo
+                rigaValore(valore: Clock.text(Double(secondi)),
+                           sotto: TimedText.doneNote(seconds: secondi, target: obiettivo),
+                           meno: "Cinque secondi in meno", piu: "Cinque secondi in più",
+                           menoAttivo: secondi > DurationLimits.range.lowerBound,
+                           piuAttivo: secondi < DurationLimits.range.upperBound) { passo in
+                    sessione.cambiaSecondi(di: passo)
+                }
+                Text(TimedText.noticeDetail(seconds: secondi, target: obiettivo))
+                    .font(.footnote)
+                    .foregroundStyle(Color.inchiostroTenue)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 4)
+                    .padding(.top, -4)
+            } else {
+                let ripetizioni = set.reps ?? set.targetReps
+                rigaValore(valore: "\(ripetizioni)",
+                           sotto: NoticeText.repsDelta(done: ripetizioni, target: set.targetReps),
+                           meno: "Una ripetizione in meno", piu: "Una ripetizione in più",
+                           menoAttivo: ripetizioni > EntryLimits.reps.lowerBound,
+                           piuAttivo: ripetizioni < EntryLimits.reps.upperBound) { passo in
+                    sessione.cambiaRipetizioni(di: passo)
+                }
+            }
+
+            if chiediFaccina && set.kind != .approach {
+                SceltaFaccina(scelta: set.feeling) { faccina in
+                    sessione.scegliFaccina(faccina)
+                }
+            }
+
+            if let scadenza = sessione.avviso?.scadenza {
+                TimelineView(.animation(minimumInterval: 0.1)) { contesto in
+                    BarraAvviso(restante: NoticeText.remaining(until: scadenza, now: contesto.date))
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+            }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { sessione.toccaAvviso() }
         .modifier(StileAvviso(schema: schema))
     }
 
-    /// Sopra il dock: spunta, «Set 1, 62,5 ×», −/+ sulle ripetizioni, «Annulla» e la riserva.
-    private func avvisoSetARipetizioni(_ set: SessionSet) -> some View {
-        let indice = sessione.avviso?.esercizio ?? 0
-        let numeri = SessionText.numbers(sessione.set[indice].map(\.kind))
-        let numero = numeri[safe: sessione.avviso?.set ?? 0] ?? 1
-        let ripetizioni = set.reps ?? set.targetReps
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 15, weight: .bold))
-                Text(SessionText.noticeTitle(set.kind, numero, weight: set.weight ?? set.targetWeight))
-                    .font(.subheadline.weight(.semibold))
+    /// Riga centrale dell'avviso: − da 64, valore a 48 con lo scarto sotto, + da 64.
+    private func rigaValore(valore: String, sotto: String, meno: String, piu: String,
+                            menoAttivo: Bool, piuAttivo: Bool,
+                            cambia: @escaping (Int) -> Void) -> some View {
+        HStack(spacing: 8) {
+            tastoAvviso("minus", etichetta: meno, attivo: menoAttivo) { cambia(-1) }
+            VStack(spacing: 2) {
+                Text(valore)
+                    .font(.piastra(48))
+                    .monospacedDigit()
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 2) {
-                    tastoRipetizioni("minus", etichetta: "Una ripetizione in meno",
-                                     attivo: ripetizioni > EntryLimits.reps.lowerBound) {
-                        sessione.cambiaRipetizioni(di: -1)
-                    }
-                    Text("\(ripetizioni)")
-                        .font(.piastra(24))
-                        .monospacedDigit()
-                        .frame(minWidth: 22)
-                    tastoRipetizioni("plus", etichetta: "Una ripetizione in più",
-                                     attivo: ripetizioni < EntryLimits.reps.upperBound) {
-                        sessione.cambiaRipetizioni(di: 1)
-                    }
-                }
-                .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Button {
-                    sessione.annullaSetFatto()
-                } label: {
-                    Text("Annulla")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .frame(height: 40)
-                        .background(Color.lamiera, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            if chiediRiserva {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Quante ne avevi ancora?")
+                    .minimumScaleFactor(0.6)
+                Text(sotto)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.inchiostroTenue)
-                HStack(spacing: 6) {
-                    ForEach(Reserve.allCases, id: \.self) { riserva in
-                        let scelta = set.reserve == riserva
-                        Button {
-                            sessione.scegliRiserva(riserva)
-                        } label: {
-                            Text(riserva.label)
-                                .font(.piastra(22))
-                                .foregroundStyle(scelta ? Color.suInchiostro : Color.inchiostro)
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(scelta ? Color.inchiostro : Color.lamiera,
-                                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(scelta ? .isSelected : [])
-                    }
-                }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.trailing, 8)
-            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            tastoAvviso("plus", etichetta: piu, attivo: piuAttivo) { cambia(1) }
         }
-        .modifier(StileAvviso(schema: schema))
     }
 
-    private func tastoRipetizioni(_ icona: String, etichetta: String, attivo: Bool,
-                                  azione: @escaping () -> Void) -> some View {
+    private func tastoAvviso(_ icona: String, etichetta: String, attivo: Bool,
+                             azione: @escaping () -> Void) -> some View {
         Button(action: azione) {
             Image(systemName: icona)
-                .font(.system(size: 17, weight: .semibold))
-                .frame(width: 40, height: 40)
+                .font(.system(size: 24, weight: .semibold))
+                .frame(width: 64, height: 64)
+                .background(Color.lamiera, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!attivo)
@@ -818,17 +797,19 @@ struct SessioneView: View {
     }
 }
 
-/// Forma dell'avviso dopo «Set fatto» (sopra il dock), uguale per ripetizioni e tempo.
+/// Forma dell'avviso dopo «Set fatto» (sopra il dock), uguale per ripetizioni e tempo: 12 pt dai bordi,
+/// angoli da 24, ombra; testo fino a xxxLarge così le righe non escono mai dai bordi.
 private struct StileAvviso: ViewModifier {
     let schema: ColorScheme
 
     func body(content: Content) -> some View {
         content
             .foregroundStyle(Color.inchiostro)
-            .padding(.top, 8)
-            .padding(.leading, 16)
-            .padding(.trailing, 8)
-            .padding(.bottom, 12)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .padding(.top, 12)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 14)
+            .frame(maxWidth: .infinity)
             .background(Color.foglio, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay {
                 // Nel tema scuro l'avviso ha un bordo sottile per staccarsi dal dock.
@@ -837,11 +818,32 @@ private struct StileAvviso: ViewModifier {
             }
             .shadow(color: Color.ombra.opacity(schema == .dark ? 0.5 : 0.24), radius: 16, x: 0, y: 12)
             .shadow(color: Color.ombra.opacity(0.16), radius: 4, x: 0, y: 2)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.bottom, 236)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .ignoresSafeArea(edges: .bottom)
             .transition(.opacity)
+    }
+}
+
+/// Barretta del tempo che resta prima che l'avviso si chiuda da solo (alta 4, dentro la card).
+private struct BarraAvviso: View {
+    let restante: Double
+
+    var body: some View {
+        GeometryReader { spazio in
+            Capsule()
+                .fill(Color.lamiera)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.inchiostroTenue)
+                        .frame(width: spazio.size.width * restante)
+                }
+        }
+        .frame(height: 4)
+        .accessibilityElement()
+        .accessibilityLabel("Si chiude da solo")
+        .accessibilityValue("\(Int((restante * NoticeText.duration).rounded(.up))) secondi")
     }
 }
 

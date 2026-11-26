@@ -8,6 +8,9 @@ public enum Feeling: String, CaseIterable, Codable, Sendable {
     case justRight = "giusto"
     case hard = "faticoso"
 
+    /// «leggero», «giusto», «faticoso» (dettaglio sessione, sotto il valore).
+    public var word: String { rawValue }
+
     /// «Leggero», «Giusto», «Faticoso».
     public var title: String {
         switch self {
@@ -15,6 +18,32 @@ public enum Feeling: String, CaseIterable, Codable, Sendable {
         case .justRight: return "Giusto"
         case .hard: return "Faticoso"
         }
+    }
+}
+
+/// Testi dell'avviso dopo «Set fatto» (UI v6, tavole 5, 6, 7 e 16).
+public enum NoticeText {
+    /// L'avviso resta aperto 10 s; ogni tocco li rinnova.
+    public static let duration: TimeInterval = 10
+    public static let feelingQuestion = "Com'è andato?"
+
+    /// «Set 1 fatto, 65 kg»; senza peso (a tempo senza «Con peso») «Set 1 fatto».
+    public static func title(_ kind: SetKind, _ number: Int, weight: Double?) -> String {
+        let name = SessionText.shortName(kind, number) + " fatto"
+        guard let weight else { return name }
+        return "\(name), \(Units.show(weight)) \(Units.unit.symbol)"
+    }
+
+    /// Sotto le ripetizioni: «+3 sull'obiettivo», «−1 sull'obiettivo», «come l'obiettivo».
+    public static func repsDelta(done: Int, target: Int) -> String {
+        let difference = done - target
+        if difference == 0 { return "come l'obiettivo" }
+        return (difference > 0 ? "+\(difference)" : "−\(-difference)") + " sull'obiettivo"
+    }
+
+    /// Parte della barretta ancora piena (tempo che resta prima che l'avviso si chiuda).
+    public static func remaining(until deadline: Date, now: Date) -> Double {
+        min(1, max(0, deadline.timeIntervalSince(now) / duration))
     }
 }
 

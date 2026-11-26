@@ -75,9 +75,9 @@ public enum EntryHints {
         return list.prefix(1).uppercased() + list.dropFirst() + " del peso di lavoro di oggi."
     }
 
-    /// «Quando arrivi a 12 in tutti i set, la volta dopo l'app propone +2,5 kg.»
+    /// «Quando arrivi a 12 in tutti i set e nessuno è faticoso, la volta dopo l'app propone +2,5 kg.» (UI v6)
     public static func progression(repsMax: Int, step: Double, unit: String = "kg") -> String {
-        "Quando arrivi a \(repsMax) in tutti i set, la volta dopo l'app propone +\(Weights.format(step)) \(unit)."
+        "Quando arrivi a \(repsMax) in tutti i set e nessuno è faticoso, la volta dopo l'app propone +\(Weights.format(step)) \(unit)."
     }
 
     /// «al 60%», «all'80%», «all'11%».
