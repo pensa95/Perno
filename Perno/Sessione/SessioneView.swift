@@ -383,11 +383,35 @@ struct SessioneView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Correggi set")
+                        .modifier(ScorriPerTogliere(attivo: sessione.puoTogliere(esercizio: indice, set: posizione)) {
+                            sessione.togliSet(esercizio: indice, set: posizione)
+                        })
                         if let riposo = riposi[safe: posizione] ?? nil {
                             RigaRecupero(testo: PlateText.restDone(riposo))
                         }
                     }
                 }
+
+                // «Aggiungi set» (UI v6, tavola 9): tratteggiato, non primario; un set uguale all'ultimo.
+                Button {
+                    withAnimation(.snappy) { sessione.aggiungiSet() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
+                        Text("Aggiungi set")
+                            .font(.body.weight(.semibold))
+                    }
+                    .foregroundStyle(Color.inchiostro)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background {
+                        BordoTratteggiato(colore: Color.inchiostro.opacity(0.3), spessore: 1.5,
+                                          trattino: 5, spazio: 4, raggio: 8)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
             .padding(.top, 16)
         }

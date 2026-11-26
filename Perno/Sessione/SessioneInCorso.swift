@@ -458,9 +458,16 @@ final class SessioneInCorso: Identifiable {
     // MARK: Menu «…» dell'esercizio
 
     /// «Aggiungi set»: un set di lavoro in più in fondo all'esercizio di adesso.
+    /// «Aggiungi set» sotto le piastre (UI v6, tavola 9): un set uguale all'ultimo (anche a tempo)
+    /// sull'esercizio mostrato. Se l'esercizio era già finito (dopo l'ultimo set o a fine sessione) si
+    /// torna lì, dal set nuovo, con il cambio esercizio da adesso.
     func aggiungiSet(alle ora: Date = .now) {
-        guard let indice = macchina.currentExerciseIndex,
+        guard let indice = indiceEsercizio,
               let nuovo = try? macchina.addSet(toExercise: indice) else { return }
+        if indice != macchina.currentExerciseIndex || macchina.phase == .finished {
+            ultimoFinito = nil
+            try? macchina.complete(exercise: indice, at: ora)
+        }
         let piano = macchina.exercises[indice].sets[nuovo]
         let registrato = SessionSet(position: nuovo, kind: piano.kind,
                                     targetWeight: piano.weight, targetReps: piano.reps)
@@ -470,6 +477,31 @@ final class SessioneInCorso: Identifiable {
         context.insert(registrato)
         registrato.sessionExercise = esercizi[indice]
         set[indice].append(registrato)
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// Si può togliere scorrendo questa piastra (set da fare, non quello in corso).
+    func puoTogliere(esercizio: Int, set indice: Int) -> Bool {
+        macchina.canDeleteUndoneSet(exercise: esercizio, set: indice)
+    }
+
+    /// «Rimuovi» scorrendo una piastra da fare (UI v6, tavola 9): il set sparisce da oggi, senza conferma.
+    func togliSet(esercizio: Int, set indice: Int, alle ora: Date = .now) {
+        do {
+            try macchina.deleteUndoneSet(exercise: esercizio, set: indice, at: ora)
+        } catch {
+            return
+        }
+        let tolto = set[esercizio].remove(at: indice)
+        context.delete(tolto)
+        for (posizione, rimasto) in set[esercizio].enumerated() {
+            rimasto.position = posizione
+        }
+        if var aperto = avviso, aperto.esercizio == esercizio, aperto.set > indice {
+            aperto = Avviso(esercizio: aperto.esercizio, set: aperto.set - 1, scadenza: aperto.scadenza)
+            avviso = aperto
+        }
         sessione.lastActivityAt = ora
         try? context.save()
     }
