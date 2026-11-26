@@ -95,14 +95,14 @@ struct SessioneView: View {
 
                 if case let .countdown(dal, _, _) = sessione.fase {
                     TimelineView(.animation(minimumInterval: 1.0 / 30)) { contesto in
-                        contoAllaRovescia(trascorsi: contesto.date.timeIntervalSince(dal))
+                        contoAllaRovescia(ora: contesto.date, dal: dal)
                     }
                 }
         }
         .background(Color.lamiera.ignoresSafeArea())
         .task(id: inizioContoAllaRovescia) {
             guard let dal = inizioContoAllaRovescia else { return }
-            let fine = dal.addingTimeInterval(TimeInterval(sessione.secondiContoAllaRovescia))
+            let fine = Countdown.end(since: dal)
             let attesa = fine.timeIntervalSinceNow
             if attesa > 0 {
                 try? await Task.sleep(nanoseconds: UInt64(attesa * 1_000_000_000))
@@ -112,12 +112,11 @@ struct SessioneView: View {
             sessione.contoAllaRovesciaFinito(alle: fine)
         }
         .task(id: inizioContoAllaRovescia) {
-            // Bip degli ultimi 3 secondi del 3-2-1 e «via»: tutti in coda subito, così suonano anche
-            // se lo schermo si blocca. Le vibrazioni seguono a ogni secondo (solo in primo piano).
+            // Bip del 3-2-1 e «via»: programmati subito sugli stessi istanti dei numeri e dell'anello
+            // (`Countdown`), così cadono al cambio del numero e suonano anche se lo schermo si blocca.
+            // Le vibrazioni seguono a ogni secondo (solo in primo piano).
             guard let dal = inizioContoAllaRovescia else { return }
-            let totale = sessione.secondiContoAllaRovescia
-            let fine = dal.addingTimeInterval(TimeInterval(totale))
-            await segnaliFinoA(fine, durata: totale)
+            await segnaliFinoA(Countdown.end(since: dal), istanti: Countdown.beeps(since: dal))
         }
         .task(id: fineRecuperoConBip) {
             // Ultimi 3 secondi del recupero alla rovescia: bip e vibrazione come nel 3-2-1. Con l'audio
@@ -205,9 +204,10 @@ struct SessioneView: View {
     /// Mette in coda i bip fino a `fine` e vibra a ogni secondo (`vibraAllaFine`: anche la vibrazione
     /// forte allo zero). Se il compito viene annullato prima dello zero (3-2-1 annullato, +15 s,
     /// set iniziato prima) ferma i bip rimasti; dopo lo zero il «via» finisce di suonare.
-    private func segnaliFinoA(_ fine: Date, durata: Int, vibraAllaFine: Bool = false) async {
+    private func segnaliFinoA(_ fine: Date, durata: Int = 3, istanti: [Date]? = nil,
+                              vibraAllaFine: Bool = false) async {
         guard fine.timeIntervalSinceNow > 0 else { return }
-        let istanti = Segnali.ultimiTre(prima: fine, durata: durata)
+        let istanti = istanti ?? Segnali.ultimiTre(prima: fine, durata: durata)
         Segnali.shared.sequenza(bip: istanti, via: fine)
         for istante in istanti + [fine] {
             let attesa = istante.timeIntervalSinceNow
@@ -793,14 +793,14 @@ struct SessioneView: View {
 
     /// Anello sottile che si svuota nel tempo del 3-2-1, numero bianco al centro
     /// (al posto del cerchio giallo pieno: scelta dell'utente del 24/11, alternativa A).
-    private func contoAllaRovescia(trascorsi: TimeInterval) -> some View {
-        let totale = Double(max(1, sessione.secondiContoAllaRovescia))
-        let restante = min(1, max(0, 1 - trascorsi / totale))
+    /// Numero e anello si leggono da `Countdown` con la stessa data di partenza dei bip.
+    private func contoAllaRovescia(ora: Date, dal: Date) -> some View {
+        let restante = Countdown.remaining(at: ora, since: dal)
         return VStack(spacing: 16) {
             Text(setCorrente(SessionText.countdownTitle))
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.piastraTenue)
-            Text("\(SessionText.countdownValue(elapsed: trascorsi, total: sessione.secondiContoAllaRovescia))")
+            Text("\(Countdown.value(at: ora, since: dal))")
                 .font(.piastra(140))
                 .monospacedDigit()
                 .foregroundStyle(.white)

@@ -1,7 +1,7 @@
 import AVFoundation
 import UIKit
 
-/// Bip e vibrazione del 3-2-1, della fine del recupero alla rovescia e dei set a tempo.
+/// Bip e vibrazione del 3-2-1 (sempre 3 s, `Countdown`), della fine del recupero alla rovescia e dei set a tempo.
 ///
 /// **Audio sempre acceso (T1, in prova)**: dall'inizio alla fine della sessione l'app tiene acceso
 /// l'audio con un silenzio in loop, in mix con la musica (`.playback` + `.mixWithOthers`, come le app
@@ -141,19 +141,16 @@ final class Segnali {
 
     // MARK: Sequenza
 
-    /// Mette in coda i bip agli istanti `bip` e il «via» all'istante `via`. Gli istanti già passati si saltano.
+    /// Programma i bip agli istanti `bip` e il «via» all'istante `via`, sull'orologio dell'audio: ogni suono
+    /// esce dall'altoparlante nell'istante dato (compensando la latenza di uscita), così cade al cambio del
+    /// numero e dell'anello del 3-2-1 (stessi istanti, da `Countdown`). Gli istanti già passati si saltano.
     func sequenza(bip: [Date], via: Date) {
         guard UserDefaults.standard.bool(forKey: Impostazioni.bip) else { return }
         if let viaInCoda, abs(viaInCoda.timeIntervalSince(via)) < 0.05 { return }
-        let adesso = Date()
-        guard via.timeIntervalSince(adesso) > -0.2 else { return }
-        var suoni: [(inizio: TimeInterval, tono: [Float])] = bip.compactMap { istante -> (inizio: TimeInterval, tono: [Float])? in
-            let inizio = istante.timeIntervalSince(adesso)
-            return inizio > -0.05 ? (max(0, inizio), Self.secondo) : nil
-        }
-        suoni.append((max(0, via.timeIntervalSince(adesso)), Self.via))
-        guard let buffer = buffer(suoni) else { return }
+        guard via.timeIntervalSinceNow > -0.2 else { return }
         do {
+            // Prima si prepara l'audio (musica abbassata), poi si prendono i tempi: la preparazione
+            // non deve spostare i bip.
             if tenuto {
                 try cambiaVolumeMusica(abbassa: true)
             } else {
@@ -164,6 +161,25 @@ final class Segnali {
                 if !motore.isRunning { try motore.start() }
             }
             lettore.stop()
+            let sessione = AVAudioSession.sharedInstance()
+            let latenza = max(0, sessione.outputLatency + sessione.ioBufferDuration)
+            let oraHost = mach_absolute_time()
+            let adesso = Date()
+            // Istante (all'altoparlante) del primo campione del suono: il primo bip, o il primo istante
+            // utile se l'audio è arrivato tardi.
+            let primoUtile = adesso.addingTimeInterval(latenza + Self.margine)
+            let origine = max(bip.min() ?? via, primoUtile)
+            var suoni: [(inizio: TimeInterval, tono: [Float])] = bip.compactMap { istante -> (inizio: TimeInterval, tono: [Float])? in
+                let inizio = istante.timeIntervalSince(origine)
+                return inizio > -0.05 ? (max(0, inizio), Self.secondo) : nil
+            }
+            suoni.append((max(0, via.timeIntervalSince(origine)), Self.via))
+            guard let buffer = buffer(suoni) else {
+                if tenuto { try? cambiaVolumeMusica(abbassa: false) } else { spegni() }
+                return
+            }
+            let anticipo = max(0, origine.timeIntervalSince(adesso) - latenza)
+            let quando = AVAudioTime(hostTime: oraHost + AVAudioTime.hostTime(forSeconds: anticipo))
             turno += 1
             let questo = turno
             viaInCoda = via
@@ -173,11 +189,14 @@ final class Segnali {
                     self?.rilascia(dopo: questo)
                 }
             }
-            lettore.play()
+            lettore.play(at: quando)
         } catch {
             // Senza audio resta la vibrazione: il 3-2-1 si vede comunque sullo schermo.
         }
     }
+
+    /// Margine per programmare il primo suono nel futuro anche quando l'audio arriva tardi.
+    private static let margine: TimeInterval = 0.02
 
     /// Ferma la sequenza con questo «via» (3-2-1 annullato, recupero allungato con +15 s, set iniziato prima).
     func ferma(via: Date) {

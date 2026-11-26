@@ -58,7 +58,7 @@ final class LiveActivityTests: XCTestCase {
             for: input(.countdown(since: since, pauseStart: t0, pauseKind: .rest)), now: since)
         XCTAssertEqual(state.tone, .rest)
         XCTAssertEqual(state.label, "Set 2 tra")
-        XCTAssertEqual(state.timerEnd, since.addingTimeInterval(3))
+        XCTAssertEqual(state.timerEnd, Countdown.end(since: since))
         XCTAssertTrue(state.bigTimer)
         XCTAssertNil(state.primary)
 

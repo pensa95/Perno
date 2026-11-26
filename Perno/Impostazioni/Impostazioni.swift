@@ -6,7 +6,6 @@ import PernoCore
 /// Chiavi e valori predefiniti delle Impostazioni (salvate in UserDefaults, non nel database).
 enum Impostazioni {
     static let riscaldamento = "impostazioni.riscaldamento"
-    static let secondiPrimaDelSet = "impostazioni.secondiPrimaDelSet"
     static let bip = "impostazioni.bip"
     static let vibrazione = "impostazioni.vibrazione"
     /// Stessa chiave usata in sessione quando si tocca il tempo del recupero.
@@ -16,14 +15,16 @@ enum Impostazioni {
     static let unita = "impostazioni.unita"
     static let passo = "impostazioni.passo"
 
-    static let secondiPossibili = [3, 5, 10]
+    /// Durata del 3-2-1 scelta fino alla UI v5 (3, 5 o 10 s): dalla v6 il 3-2-1 dura sempre 3 s
+    /// e il valore salvato si cancella.
+    private static let vecchiSecondiPrimaDelSet = "impostazioni.secondiPrimaDelSet"
 
-    /// Valori predefiniti della tavola: riscaldamento, bip, vibrazione e riserva attivi, 3-2-1 di
-    /// 3 s, recupero a cronometro senza partenza automatica, chili con passo 2,5.
+    /// Valori predefiniti della tavola: riscaldamento, bip, vibrazione e riserva attivi,
+    /// recupero a cronometro senza partenza automatica, chili con passo 2,5.
     static func registraPredefiniti() {
+        UserDefaults.standard.removeObject(forKey: vecchiSecondiPrimaDelSet)
         UserDefaults.standard.register(defaults: [
             riscaldamento: true,
-            secondiPrimaDelSet: 3,
             bip: true,
             vibrazione: true,
             modoRecupero: RestMode.stopwatch.rawValue,
@@ -35,11 +36,6 @@ enum Impostazioni {
     }
 
     static var riscaldamentoAttivo: Bool { UserDefaults.standard.bool(forKey: riscaldamento) }
-
-    static var secondiContoAllaRovescia: Int {
-        let valore = UserDefaults.standard.integer(forKey: secondiPrimaDelSet)
-        return secondiPossibili.contains(valore) ? valore : 3
-    }
 
     /// Porta «Unità e dischi» in `PernoCore` (formati dei pesi e passo dei dischi).
     static func applicaUnita() {
@@ -82,13 +78,12 @@ final class Aspetto {
 
 // MARK: - Impostazioni
 
-/// Impostazioni (tavola «Impostazioni», sezione della barra dal 24/11): Aspetto, Riscaldamento, Prima di ogni set, Recupero,
+/// Impostazioni (tavola «Impostazioni», sezione della barra dal 24/11): Aspetto, Riscaldamento, Segnali (3-2-1 sempre 3 s, UI v6), Recupero,
 /// Dopo ogni set, Dati.
 struct ImpostazioniView: View {
     @Environment(Aspetto.self) private var aspetto
 
     @AppStorage(Impostazioni.riscaldamento) private var riscaldamento = true
-    @AppStorage(Impostazioni.secondiPrimaDelSet) private var secondi = 3
     @AppStorage(Impostazioni.bip) private var bip = true
     @AppStorage(Impostazioni.vibrazione) private var vibrazione = true
     @AppStorage(Impostazioni.modoRecupero) private var modoRecupero: RestMode = .stopwatch
@@ -118,12 +113,10 @@ struct ImpostazioniView: View {
                                  acceso: $riscaldamento)
                 }
 
-                sezione("Prima di ogni set") {
-                    SelettoreSegmenti(valori: Impostazioni.secondiPossibili, selezione: $secondi,
-                                      etichetta: { "\($0) s" })
+                sezione("Segnali", nota: "Il 3-2-1 prima di ogni set dura sempre 3 s.") {
                     Pila {
                         Interruttore(titolo: "Bip",
-                                     sottotitolo: "Si sente sopra la musica, che si abbassa un attimo",
+                                     sottotitolo: "Anche a schermo bloccato, sopra la musica che si abbassa un attimo",
                                      acceso: $bip)
                         Interruttore(titolo: "Vibrazione", sottotitolo: "Utile con il telefono in silenzioso",
                                      acceso: $vibrazione)
