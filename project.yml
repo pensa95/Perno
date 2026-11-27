@@ -33,6 +33,7 @@ targets:
         CFBundleDisplayName: Perno
         UILaunchScreen:
           UIColorName: Lamiera
+          UIImageName: LaunchMarchio
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
