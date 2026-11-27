@@ -17,6 +17,8 @@ extension Color {
     static let perno = Color.token(light: 0xF5B700, dark: 0xF5B700)
     static let suPerno = Color.token(light: 0x1C2226, dark: 0x1C2226)
     static let recupero = Color.token(light: 0x2457B8, dark: 0x2457B8)
+    /// Testo blu del recupero in corso sulla lamiera (D12): #2457B8 nel chiaro, più chiaro nello scuro (3:1).
+    static let recuperoTesto = Color.token(light: 0x2457B8, dark: 0x7FA6F0)
     static let recuperoTenue = Color.token(light: 0xC9DAF7, dark: 0xC9DAF7)
     static let riscaldamento = Color.token(light: 0xC2410C, dark: 0xC2410C)
     /// Testi tenui sul fondo arancio: #FFF1EA arriva a 4,7:1 (prima #FFE4D6, 4,3:1).

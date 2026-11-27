@@ -88,9 +88,14 @@ struct VocePila: View {
     var sottotitolo: String? = nil
     var dettaglio: String? = nil
     var freccia = true
+    /// Icona del gruppo muscolare a sinistra (D8, Libreria).
+    var gruppo: MuscleGroup? = nil
 
     var body: some View {
         HStack(spacing: 12) {
+            if let gruppo {
+                IconaGruppo(gruppo: gruppo, dimensione: 28)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(titolo)
                     .font(.body.weight(.semibold))
@@ -189,10 +194,11 @@ struct PulsanteGiallo: View {
     }
 }
 
-/// Pulsante tondo da 44 pt con un'icona (X, +): fondo foglio.
+/// Pulsante tondo con un'icona (X, +): fondo foglio, 44 pt (38 pt nella riga dell'esercizio, D5).
 struct PulsanteTondo: View {
     let icona: String
     let etichetta: String
+    var dimensione: CGFloat = 44
     let azione: () -> Void
 
     var body: some View {
@@ -200,7 +206,7 @@ struct PulsanteTondo: View {
             Image(systemName: icona)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.inchiostro)
-                .frame(width: 44, height: 44)
+                .frame(width: dimensione, height: dimensione)
                 .background(Color.foglio, in: Circle())
         }
         .buttonStyle(.plain)

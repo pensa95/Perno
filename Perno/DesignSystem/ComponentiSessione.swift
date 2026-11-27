@@ -32,12 +32,14 @@ extension View {
 
 // MARK: - Piastra del set
 
-/// Piastra di un set: adesso = grafite alta 88 pt con il perno; fatta = fondo chiaro pieno con la spunta;
-/// da fare = solo bordo, numeri tenui e «obiettivo».
+/// Piastra di un set (D13: senza etichette «Set N», «obiettivo», «prossimo»: bastano colore e posizione):
+/// adesso = grafite alta 88 pt con il perno; fatta = fondo chiaro pieno con la spunta; da fare = solo bordo e
+/// numeri tenui. Le etichette restano solo per VoiceOver.
 struct PiastraSet: View {
     enum Stato {
-        /// `evidenza` è il dato in chiaro a destra («+2,5 kg»), `nota` quello tenue («prima 60 × 12»).
-        case adesso(etichetta: String, evidenza: String?, nota: String?)
+        /// `inCorso`: «in corso» a destra in alto durante il set. `evidenza` è il dato in chiaro a destra
+        /// («+2,5 kg»), `nota` quello tenue («prima 60 × 12»).
+        case adesso(inCorso: Bool, evidenza: String?, nota: String?)
         case fatta(nota: String?)
         case daFare
     }
@@ -53,26 +55,26 @@ struct PiastraSet: View {
     var faccina: Feeling? = nil
     /// Piastra di lavoro fatta senza faccina: un posto vuoto tratteggiato dice che si può scegliere (D3).
     var faccinaVuota = false
-    /// Nota della piastra da fare: «obiettivo», o «prossimo» durante il recupero.
+    /// Solo per VoiceOver: «obiettivo», o «prossimo» durante il recupero (non si vede più).
     var notaDaFare = "obiettivo"
     @Environment(\.spazioPerno) private var spazioPerno
 
     var body: some View {
         Group {
             switch stato {
-            case let .adesso(etichetta, evidenza, nota):
-                adesso(etichetta: etichetta, evidenza: evidenza, nota: nota)
+            case let .adesso(inCorso, evidenza, nota):
+                adesso(inCorso: inCorso, evidenza: evidenza, nota: nota)
             case let .fatta(nota):
                 riga(fatta: true, nota: nota)
             case .daFare:
-                riga(fatta: false, nota: notaDaFare)
+                riga(fatta: false, nota: nil)
             }
         }
         // Piastre ad altezza fissa (88 e 44 pt, come nelle tavole): il testo cresce fino a xxxLarge.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
-    private func adesso(etichetta: String, evidenza: String?, nota: String?) -> some View {
+    private func adesso(inCorso: Bool, evidenza: String?, nota: String?) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(Color.perno).frame(width: 26, height: 26)
@@ -80,20 +82,20 @@ struct PiastraSet: View {
             }
             .pernoCondiviso(spazioPerno)
             .frame(width: 28)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(etichetta)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(calda ? Color.avvicinamentoTenue : Color.piastraTenue)
-                Text(valore)
-                    .font(.piastra(48))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.piastraTesto)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .numeriCheRuotano(valore)
-            }
+            Text(valore)
+                .font(.piastra(48))
+                .monospacedDigit()
+                .foregroundStyle(Color.piastraTesto)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .numeriCheRuotano(valore)
             Spacer(minLength: 0)
+            // A destra: «in corso» in alto durante il set, sotto «+2,5 kg» e «prima 60 × 12» (più tenue);
+            // prima del set restano solo questi due, al centro.
             VStack(alignment: .trailing, spacing: 4) {
+                if inCorso {
+                    Text("in corso").fontWeight(.semibold).foregroundStyle(Color.piastraTesto)
+                }
                 if let evidenza {
                     Text(evidenza).fontWeight(.semibold).foregroundStyle(Color.piastraTesto)
                 }
@@ -103,13 +105,15 @@ struct PiastraSet: View {
             }
             .font(.footnote.weight(.medium))
             .lineLimit(1)
+            .frame(maxHeight: .infinity, alignment: inCorso ? .top : .center)
+            .padding(.vertical, inCorso ? 14 : 0)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 88, maxHeight: 88)
         .background(calda ? Color.avvicinamentoAdesso : Color.piastra,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(nome), adesso. \(valore)")
+        .accessibilityLabel("\(nome), adesso\(inCorso ? ", in corso" : ""). \(valore)")
     }
 
     private func riga(fatta: Bool, nota: String?) -> some View {
@@ -128,12 +132,6 @@ struct PiastraSet: View {
                 }
             }
             .frame(width: 28, alignment: .leading)
-            Text(nome)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
-                .frame(minWidth: 52, alignment: .leading)
-                .lineLimit(1)
-                .fixedSize()
             HStack(spacing: 8) {
                 Text(valore)
                     .font(.piastra(26, peso: fatta ? .semibold : .medium))
@@ -187,54 +185,57 @@ struct PiastraSet: View {
         .accessibilityLabel(fatta
             ? ([("\(nome) fatto, \(valore)"), badge.map { "\($0) sull'obiettivo" }, faccina?.word]
                 .compactMap { $0 }.joined(separator: ", "))
-            : "\(nome) da fare, \(notaDaFare) \(valore)")
+            : "\(nome), \(notaDaFare) \(valore)")
     }
 }
 
-/// Recupero in corso come piastrina tra il set fatto e il set dopo (UI v6, tavole 5, 5b, 5c): blu, alta 52,
-/// perno, «Recupero» con il tempo del dock, a destra «di solito 2:10» o «fissato a 2:00».
-struct PiastrinaRecupero: View {
+/// Recupero in corso come riga tra il set fatto e il set dopo (D12, al posto della piastrina di T7): la stessa
+/// riga dei recuperi, più alta (44 pt), «Recupero 1:24» in blu a 18 pt, il perno giallo a sinistra (segna sempre
+/// «adesso», C5), a destra «di solito 2:10» o «fissato a 2:00». Niente card e niente fondo.
+struct RigaRecuperoInCorso: View {
     let tempo: String
     let nota: String?
     @Environment(\.spazioPerno) private var spazioPerno
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             ZStack {
                 Circle().fill(Color.perno).frame(width: 26, height: 26)
                 Circle().fill(Color.suPerno).frame(width: 8, height: 8)
             }
             .pernoCondiviso(spazioPerno)
             .frame(width: 28)
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text("Recupero")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 18, weight: .semibold))
                 Text(tempo)
-                    .font(.piastra(30))
+                    .font(.piastra(26))
                     .monospacedDigit()
             }
+            .foregroundStyle(Color.recuperoTesto)
             .lineLimit(1)
             Spacer(minLength: 0)
             if let nota {
                 Text(nota)
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.recuperoTenue)
+                    .foregroundStyle(Color.inchiostroTenue)
                     .lineLimit(1)
             }
         }
-        .foregroundStyle(.white)
         .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
-        .background(Color.recupero, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Recupero in corso, \(tempo)")
     }
 }
 
-/// Recupero finito tra due set: riga sottile «recupero 2:12» con l'orologio (tempo misurato).
+/// Riga sottile tra due set (D12): orologio e testo. «recupero 2:12» col tempo misurato (recupero finito) o
+/// solo «recupero» (ancora da fare, più tenue).
 struct RigaRecupero: View {
     let testo: String
+    /// Recupero non ancora fatto: stessa riga, più tenue.
+    var previsto = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -244,9 +245,11 @@ struct RigaRecupero: View {
                 .font(.footnote.weight(.medium))
         }
         .foregroundStyle(Color.inchiostroTenue)
+        .opacity(previsto ? 0.6 : 1)
         .padding(.leading, 20)
         .frame(maxWidth: .infinity, minHeight: 24, maxHeight: 24, alignment: .leading)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .combine)
     }
 }
 

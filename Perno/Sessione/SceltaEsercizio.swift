@@ -8,6 +8,8 @@ import PernoCore
 struct SceltaEsercizio: View {
     let sessione: SessioneInCorso
     let scegli: () -> Void
+    /// Scaletta: dalla testata è passata nella riga del titolo (D5).
+    let scaletta: () -> Void
 
     @Query private var libreria: [Exercise]
 
@@ -26,6 +28,7 @@ struct SceltaEsercizio: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
                 if let riscaldamento = FreeSessionText.warmUpDone(sessione.durataRiscaldamento) {
                     Text(riscaldamento)
@@ -35,6 +38,9 @@ struct SceltaEsercizio: View {
                 Text(FreeSessionText.title(exercisesSoFar: sessione.esercizi.count))
                     .font(.piastra(40))
                     .foregroundStyle(Color.inchiostro)
+            }
+                Spacer(minLength: 0)
+                PulsanteTondo(icona: "list.bullet", etichetta: "Scaletta", dimensione: 38, azione: scaletta)
             }
             .padding(.top, 24)
 
