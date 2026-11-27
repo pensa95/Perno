@@ -20,6 +20,10 @@ struct RiepilogoView: View {
     @State private var chiediEliminazione = false
     @State private var notaAperta = false
     @FocusState private var notaAttiva: Bool
+    /// Numeri che salgono contando da 0 a 1 (C10) e record che compaiono uno dopo l'altro.
+    @State private var progresso: Double = 0
+    @State private var recordVisibili = false
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,7 +56,16 @@ struct RiepilogoView: View {
         } message: {
             Text("La sessione viene eliminata con tutti i set.")
         }
-        .onAppear { notaAperta = !sessione.note.isEmpty }
+        .onAppear {
+            notaAperta = !sessione.note.isEmpty
+            if menoMovimento {
+                progresso = 1
+                recordVisibili = true
+            } else {
+                withAnimation(.easeOut(duration: 0.8)) { progresso = 1 }
+                recordVisibili = true
+            }
+        }
     }
 
     // MARK: Testata
@@ -123,14 +136,13 @@ struct RiepilogoView: View {
     // MARK: Numeri
 
     private var numeri: some View {
-        HStack(alignment: .top, spacing: 12) {
-            NumeroGrande(valore: HomeText.duration(fine.timeIntervalSince(sessione.startedAt)), etichetta: "durata")
-            NumeroGrande(valore: "\(sessione.setFatti)/\(sessione.setPrevisti)", etichetta: "set")
-            NumeroGrande(valore: HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)),
-                         etichetta: Units.unit.symbol,
-                         variazione: SessionSummary.volumeChange(today: sessione.chiliSollevati,
-                                                                 previous: sessione.chiliVoltaScorsa))
-        }
+        NumeriRiepilogo(progresso: progresso,
+                        secondi: fine.timeIntervalSince(sessione.startedAt),
+                        setFatti: sessione.setFatti,
+                        setPrevisti: sessione.setPrevisti,
+                        chili: sessione.chiliSollevati,
+                        variazione: SessionSummary.volumeChange(today: sessione.chiliSollevati,
+                                                                previous: sessione.chiliVoltaScorsa))
     }
 
     // MARK: Set non fatti e record
@@ -158,7 +170,7 @@ struct RiepilogoView: View {
                     }
                     .vocePila()
                 }
-                ForEach(Array(record.enumerated()), id: \.offset) { _, voce in
+                ForEach(Array(record.enumerated()), id: \.offset) { indice, voce in
                     HStack(spacing: 12) {
                         Image(systemName: "trophy")
                             .font(.system(size: 18, weight: .semibold))
@@ -178,6 +190,10 @@ struct RiepilogoView: View {
                     }
                     .vocePila()
                     .accessibilityElement(children: .combine)
+                    .opacity(recordVisibili ? 1 : 0)
+                    .offset(y: recordVisibili ? 0 : 8)
+                    .animation(menoMovimento ? nil : .easeOut(duration: 0.3).delay(0.8 + 0.2 * Double(indice)),
+                               value: recordVisibili)
                 }
             }
             .padding(.top, 28)
@@ -226,6 +242,32 @@ struct RiepilogoView: View {
                 .vocePila()
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Durata, set e kg che salgono contando fino al valore (C10): `progresso` va da 0 a 1 con un'animazione e la
+/// vista si ridisegna a ogni fotogramma. A 1 i valori sono quelli veri.
+private struct NumeriRiepilogo: View, Animatable {
+    var progresso: Double
+    let secondi: Double
+    let setFatti: Int
+    let setPrevisti: Int
+    let chili: Double
+    let variazione: String?
+
+    var animatableData: Double {
+        get { progresso }
+        set { progresso = newValue }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            NumeroGrande(valore: HomeText.duration(secondi * progresso), etichetta: "durata")
+            NumeroGrande(valore: "\(Int((Double(setFatti) * progresso).rounded()))/\(setPrevisti)", etichetta: "set")
+            NumeroGrande(valore: HomeText.volume(Units.unit.fromKilograms(chili * progresso)),
+                         etichetta: Units.unit.symbol,
+                         variazione: variazione)
         }
     }
 }

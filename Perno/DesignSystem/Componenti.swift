@@ -347,7 +347,7 @@ struct StepperPiastra: View {
                 .foregroundStyle(Color.inchiostro)
                 .frame(minWidth: 36)
                 .frame(maxWidth: riempi ? .infinity : nil)
-                .contentTransition(.numericText())
+                .numeriCheRuotano(valore)
             tasto("plus", attivo: piuAttivo, etichetta: etichettaPiu, azione: piu)
         }
         .frame(maxWidth: riempi ? .infinity : nil)
@@ -366,6 +366,27 @@ struct StepperPiastra: View {
         .disabled(!attivo)
         .opacity(attivo ? 1 : 0.3)
         .accessibilityLabel(etichetta)
+    }
+}
+
+// MARK: - Numeri che ruotano
+
+/// Le cifre ruotano quando il valore cambia (C7); con «Riduci movimento» cambiano di colpo.
+private struct NumeriCheRuotano: ViewModifier {
+    let valore: String
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
+
+    func body(content: Content) -> some View {
+        content
+            .contentTransition(.numericText())
+            .animation(menoMovimento ? nil : .snappy(duration: 0.25), value: valore)
+    }
+}
+
+extension View {
+    /// Da mettere su un `Text` con un valore che cambia (ripetizioni, peso, durata).
+    func numeriCheRuotano(_ valore: String) -> some View {
+        modifier(NumeriCheRuotano(valore: valore))
     }
 }
 
