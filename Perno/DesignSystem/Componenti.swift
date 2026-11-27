@@ -355,7 +355,7 @@ struct StepperPiastra: View {
     }
 
     private func tasto(_ icona: String, attivo: Bool, etichetta: String, azione: @escaping () -> Void) -> some View {
-        Button(action: azione) {
+        Button(action: { Aptica.tick(piu: icona == "plus"); azione() }) {
             Image(systemName: icona)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.inchiostro)
@@ -385,6 +385,7 @@ struct SelettoreSegmenti<Valore: Hashable>: View {
             ForEach(valori, id: \.self) { valore in
                 let scelto = valore == selezione
                 Button {
+                    if valore != selezione { Aptica.selezione.dai() }
                     selezione = valore
                 } label: {
                     Text(etichetta(valore))

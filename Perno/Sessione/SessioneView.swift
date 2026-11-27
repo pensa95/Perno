@@ -19,6 +19,8 @@ struct SessioneView: View {
     @State private var progressi: Exercise?
     @Environment(\.colorScheme) private var schema
     @Environment(\.accessibilityReduceMotion) private var menoMovimento
+    /// Il perno scivola dalla piastra fatta alla piastrina del recupero e al set dopo (C5).
+    @Namespace private var spazioPerno
     @AppStorage(Impostazioni.chiediFaccina) private var chiediFaccina = true
     /// Regolazioni (15 pt, 18 pt in evidenza) e icone accanto: crescono con «Testo più grande».
     @ScaledMetric(relativeTo: .subheadline) private var dimensioneRegolazioni: CGFloat = 15
@@ -99,6 +101,7 @@ struct SessioneView: View {
                     TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
                         dock(ora: contesto.date)
                     }
+                    .animation(menoMovimento ? nil : .easeInOut(duration: 0.3), value: chiaveDock)
                 }
                 .ignoresSafeArea(edges: .bottom)
 
@@ -434,7 +437,22 @@ struct SessioneView: View {
                 .padding(.top, 4)
             }
             .padding(.top, 16)
+            .environment(\.spazioPerno, spazioPerno)
+            .animation(menoMovimento ? nil : .spring(duration: 0.35, bounce: 0.12), value: chiavePiastre)
         }
+    }
+
+    /// Cambia a ogni passaggio dei set (set di adesso, recupero, 3-2-1, set in corso): serve ad animare le piastre
+    /// e lo spostamento del perno.
+    private var chiavePiastre: Int {
+        let fase: Int
+        switch sessione.fase {
+        case .rest: fase = 1
+        case .countdown: fase = 2
+        case .inSet: fase = 3
+        default: fase = 0
+        }
+        return ((sessione.macchina.currentExerciseIndex ?? -1) * 1000 + sessione.macchina.setIndex) * 10 + fase
     }
 
     /// Prima del set di adesso: durante il recupero la piastrina blu con il tempo del dock; durante il 3-2-1
@@ -676,11 +694,31 @@ struct SessioneView: View {
 
     // MARK: Dock
 
+    /// Il dock è sempre lo stesso `DockSessione` (nil solo a sessione finita): così, cambiando fase, il colore
+    /// del fondo e il resto passano con una dissolvenza (C6) invece di sostituire la vista.
     @ViewBuilder
     private func dock(ora: Date) -> some View {
+        if let dock = dockSessione(ora: ora) {
+            dock
+        }
+    }
+
+    /// Cambia a ogni passaggio del dock (riscaldamento, cambio, 3-2-1, set, recupero): serve ad animarlo.
+    private var chiaveDock: Int {
+        switch sessione.fase {
+        case .warmUp: return 1
+        case .changeover: return sessione.esercizioFinito != nil ? 2 : 3
+        case let .countdown(_, _, tipo): return tipo == .rest ? 4 : 5
+        case .inSet: return setCorrenteATempo ? 6 : 7
+        case .rest: return 8
+        case .finished: return 9
+        }
+    }
+
+    private func dockSessione(ora: Date) -> DockSessione? {
         switch sessione.fase {
         case let .warmUp(dal):
-            DockSessione(
+            return DockSessione(
                 sfondo: .riscaldamento, coloreEtichetta: .riscaldamentoTenue, coloreTesto: .white,
                 etichetta: "Riscaldamento in corso",
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
@@ -690,7 +728,7 @@ struct SessioneView: View {
             // Fine dell'ultimo set di un esercizio (tavola 6): si resta qui, «Vai a …» apre il cambio.
             let prossimo = sessione.macchina.currentExerciseIndex.map { sessione.esercizi[$0] }
             let nome = prossimo?.name ?? ""
-            DockSessione(
+            return DockSessione(
                 sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,
                 etichetta: "Cambio esercizio",
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
@@ -701,7 +739,7 @@ struct SessioneView: View {
                     NextExerciseText.subtitle(exercise: nome, detail: sessione.dettaglioProssimo($0))
                 })
         case let .changeover(dal):
-            DockSessione(
+            return DockSessione(
                 sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,
                 etichetta: "Cambio esercizio",
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
@@ -713,34 +751,36 @@ struct SessioneView: View {
                                                      azione: { aggiungiAperto = true }))
                     : pulsanteInizia)
         case let .countdown(dal, inizioPausa, tipo):
-            DockSessione(
+            return DockSessione(
                 sfondo: .piastra, coloreEtichetta: .piastraTenue, coloreTesto: .white,
                 etichetta: tipo == .rest ? "Recupero finito" : "Cambio esercizio",
                 tempo: SessionText.clock(dal.timeIntervalSince(inizioPausa)))
         case let .inSet(dal) where setCorrenteATempo:
             let obiettivo = sessione.setCorrente.map(sessione.obiettivoSecondi) ?? DurationLimits.standard
             let trascorsi = ora.timeIntervalSince(dal)
-            DockSessione(
+            return DockSessione(
                 sfondo: .foglio, coloreEtichetta: .inchiostroTenue, coloreTesto: .inchiostro,
                 etichetta: setCorrente(TimedText.inProgress),
                 tempo: TimedText.remaining(elapsed: trascorsi, target: obiettivo),
                 principale: DockSessione.Pulsante(titolo: setCorrente(SessionText.doneTitle), sfondo: .inchiostro, testo: .suInchiostro) {
+                    Aptica.setFatto.dai()
                     sessione.setFatto()
                 },
                 bordoSopra: true,
                 notaTempo: TimedText.of(seconds: obiettivo),
                 avanzamento: TimedText.progress(elapsed: trascorsi, target: obiettivo))
         case let .inSet(dal):
-            DockSessione(
+            return DockSessione(
                 sfondo: .foglio, coloreEtichetta: .inchiostroTenue, coloreTesto: .inchiostro,
                 etichetta: setCorrente(SessionText.inProgress),
                 tempo: SessionText.clock(ora.timeIntervalSince(dal)),
                 principale: DockSessione.Pulsante(titolo: setCorrente(SessionText.doneTitle), sfondo: .inchiostro, testo: .suInchiostro) {
+                    Aptica.setFatto.dai()
                     sessione.setFatto()
                 },
                 bordoSopra: true)
         case let .rest(dal):
-            DockSessione(
+            return DockSessione(
                 sfondo: .recupero, coloreEtichetta: .recuperoTenue, coloreTesto: .white,
                 etichetta: sessione.etichettaRecupero,
                 tempo: RestTimer.display(mode: sessione.modoRecupero, elapsed: ora.timeIntervalSince(dal),
@@ -751,7 +791,7 @@ struct SessioneView: View {
                 principale: pulsanteInizia,
                 azioneTempo: { sessione.cambiaModoRecupero() })
         case .finished:
-            EmptyView()
+            return nil
         }
     }
 
@@ -889,7 +929,7 @@ struct SessioneView: View {
 
     private func tastoAvviso(_ icona: String, etichetta: String, attivo: Bool,
                              azione: @escaping () -> Void) -> some View {
-        Button(action: azione) {
+        Button(action: { Aptica.tick(piu: icona == "plus"); azione() }) {
             Image(systemName: icona)
                 .font(.system(size: 24, weight: .semibold))
                 .frame(width: 64, height: 64)

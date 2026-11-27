@@ -59,6 +59,7 @@ struct SceltaFaccina: View {
                 ForEach(Feeling.allCases, id: \.self) { faccina in
                     let attiva = faccina == scelta
                     Button {
+                        Aptica.selezione.dai()
                         scegli(faccina)
                     } label: {
                         VStack(spacing: 4) {

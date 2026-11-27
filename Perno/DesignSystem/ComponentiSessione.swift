@@ -3,6 +3,33 @@ import PernoCore
 
 // Componenti propri della schermata della sessione (UI v3): piastra del set e dock.
 
+// MARK: - Perno condiviso
+
+private struct SpazioPernoKey: EnvironmentKey {
+    static let defaultValue: Namespace.ID? = nil
+}
+
+extension EnvironmentValues {
+    /// Spazio in cui il perno passa da una piastra all'altra (C5): lo imposta la schermata della sessione.
+    var spazioPerno: Namespace.ID? {
+        get { self[SpazioPernoKey.self] }
+        set { self[SpazioPernoKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Il perno della piastra di adesso e quello della piastrina del recupero sono lo stesso perno: cambiando
+    /// piastra scivola dall'una all'altra (senza spazio, per esempio fuori dalla sessione, resta com'è).
+    @ViewBuilder
+    func pernoCondiviso(_ spazio: Namespace.ID?) -> some View {
+        if let spazio {
+            matchedGeometryEffect(id: "perno", in: spazio)
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Piastra del set
 
 /// Piastra di un set: adesso = grafite alta 88 pt con il perno; fatta = fondo chiaro pieno con la spunta;
@@ -26,6 +53,7 @@ struct PiastraSet: View {
     var faccina: Feeling? = nil
     /// Nota della piastra da fare: «obiettivo», o «prossimo» durante il recupero.
     var notaDaFare = "obiettivo"
+    @Environment(\.spazioPerno) private var spazioPerno
 
     var body: some View {
         Group {
@@ -48,6 +76,7 @@ struct PiastraSet: View {
                 Circle().fill(Color.perno).frame(width: 26, height: 26)
                 Circle().fill(Color.suPerno).frame(width: 8, height: 8)
             }
+            .pernoCondiviso(spazioPerno)
             .frame(width: 28)
             VStack(alignment: .leading, spacing: 4) {
                 Text(etichetta)
@@ -157,6 +186,7 @@ struct PiastraSet: View {
 struct PiastrinaRecupero: View {
     let tempo: String
     let nota: String?
+    @Environment(\.spazioPerno) private var spazioPerno
 
     var body: some View {
         HStack(spacing: 12) {
@@ -164,6 +194,7 @@ struct PiastrinaRecupero: View {
                 Circle().fill(Color.perno).frame(width: 26, height: 26)
                 Circle().fill(Color.suPerno).frame(width: 8, height: 8)
             }
+            .pernoCondiviso(spazioPerno)
             .frame(width: 28)
             HStack(spacing: 10) {
                 Text("Recupero")
@@ -416,6 +447,8 @@ struct ScorriPerTogliere: ViewModifier {
     @State private var spostamento: CGFloat = 0
     @State private var aperto = false
     @State private var orizzontale: Bool?
+    /// Oltre la metà di «Rimuovi»: al rilascio resta aperto. Il superamento dà un colpo aptico.
+    @State private var oltreMeta = false
     private let larghezza: CGFloat = 104
 
     @ViewBuilder
@@ -477,9 +510,17 @@ struct ScorriPerTogliere: ViewModifier {
                 aperte.tocchiBloccatiFinoA = .distantFuture
                 if aperte.aperta != identita { aperte.aperta = identita }
                 spostamento = posizione(valore.translation.width)
+                let passata = spostamento < -larghezza / 2
+                if passata != oltreMeta {
+                    oltreMeta = passata
+                    if passata { Aptica.soglia.dai() }
+                }
             }
             .onEnded { valore in
-                defer { orizzontale = nil }
+                defer {
+                    orizzontale = nil
+                    oltreMeta = false
+                }
                 guard orizzontale == true else { return }
                 aperte.tocchiBloccatiFinoA = Date().addingTimeInterval(0.4)
                 if posizione(valore.translation.width) < -larghezza / 2 {

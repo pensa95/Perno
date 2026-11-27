@@ -125,7 +125,7 @@ struct ObiettiviOggiView: View {
     }
 
     private func tasto(_ icona: String, etichetta: String, attivo: Bool, azione: @escaping () -> Void) -> some View {
-        Button(action: azione) {
+        Button(action: { Aptica.tick(piu: icona == "plus"); azione() }) {
             Image(systemName: icona)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.inchiostro)
