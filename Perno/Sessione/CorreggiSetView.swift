@@ -193,6 +193,7 @@ struct CorreggiSetView: View {
                     .foregroundStyle(Color.inchiostro)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .numeriCheRuotano(valore)
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .contentShape(Rectangle())
             }

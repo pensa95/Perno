@@ -88,6 +88,7 @@ struct PiastraSet: View {
                     .foregroundStyle(Color.piastraTesto)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .numeriCheRuotano(valore)
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 4) {
@@ -138,6 +139,7 @@ struct PiastraSet: View {
                     .foregroundStyle(fatta ? Color.inchiostro : Color.inchiostroTenue)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .numeriCheRuotano(valore)
                 if fatta, let badge {
                     Text(badge)
                         .font(.footnote.weight(.bold))

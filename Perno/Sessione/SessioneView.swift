@@ -15,6 +15,13 @@ struct SessioneView: View {
     let elimina: () -> Void
 
     @State private var correzione: Correzione?
+    /// Set fatto da eliminare dal menu della piastra (con conferma, come in Correggi set).
+    @State private var setDaEliminare: Correzione?
+    /// Record battuto con l'ultimo «Set fatto»: toast in alto per 3 s (C9).
+    @State private var recordToast: SessionSummary.Record?
+    /// Ultimo record noto di ogni esercizio, per accorgersi di uno nuovo.
+    @State private var recordNoti: [String: SessionSummary.Record] = [:]
+    @State private var numeroToast = 0
     /// Progressi: dettaglio dell'esercizio di adesso, in un foglio.
     @State private var progressi: Exercise?
     @Environment(\.colorScheme) private var schema
@@ -57,12 +64,16 @@ struct SessioneView: View {
                 .transition(menoMovimento ? .opacity : .move(edge: .leading))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: sessione.riepilogoAperto)
+        .animation(menoMovimento ? nil : .easeInOut(duration: 0.3), value: sessione.riepilogoAperto)
         .onChange(of: sessione.fase) { _, fase in annunciaFase(fase) }
+        .onChange(of: sessione.macchina.completedSets.count) { _, _ in controllaRecord() }
         .onChange(of: sessione.conclusa) { _, conclusa in
             if conclusa { chiudi() }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+            recordNoti = Dictionary(sessione.sessione.record.map { ($0.exercise, $0) }, uniquingKeysWith: { $1 })
+        }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
     }
 
@@ -71,33 +82,42 @@ struct SessioneView: View {
         // schermata si ridisegna solo quando cambia la sessione.
         ZStack {
                 VStack(spacing: 0) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
-                                testata(ora: contesto.date)
+                    ScrollViewReader { lettore in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
+                                    testata(ora: contesto.date)
+                                }
+                                if case .warmUp = sessione.fase {
+                                    riscaldamento
+                                } else if sessione.daScegliere {
+                                    SceltaEsercizio(sessione: sessione) { aggiungiAperto = true }
+                                } else {
+                                    esercizio
+                                }
                             }
-                            if case .warmUp = sessione.fase {
-                                riscaldamento
-                            } else if sessione.daScegliere {
-                                SceltaEsercizio(sessione: sessione) { aggiungiAperto = true }
-                            } else {
-                                esercizio
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                            .padding(.bottom, 16)
+                            .background(alignment: .top) {
+                                GeometryReader { spazio in
+                                    Color.clear.preference(key: CimaPagina.self,
+                                                           value: spazio.frame(in: .named("paginaSessione")).minY)
+                                }
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
-                        .background(alignment: .top) {
-                            GeometryReader { spazio in
-                                Color.clear.preference(key: CimaPagina.self,
-                                                       value: spazio.frame(in: .named("paginaSessione")).minY)
+                        .coordinateSpace(name: "paginaSessione")
+                        .onPreferenceChange(CimaPagina.self) { cima in inCima = cima >= -1 }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .chiudiScorriSeScorre()
+                        // Al cambio di set o di fase la pagina scorre alla piastra di adesso, se non si vede (C8).
+                        .onChange(of: chiavePiastre) { _, _ in
+                            guard let indice = sessione.macchina.currentExerciseIndex else { return }
+                            withAnimation(menoMovimento ? nil : .easeInOut(duration: 0.35)) {
+                                lettore.scrollTo("piastra-\(indice)-\(sessione.macchina.setIndex)")
                             }
                         }
                     }
-                    .coordinateSpace(name: "paginaSessione")
-                    .onPreferenceChange(CimaPagina.self) { cima in inCima = cima >= -1 }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .chiudiScorriSeScorre()
                     TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
                         dock(ora: contesto.date)
                     }
@@ -107,6 +127,15 @@ struct SessioneView: View {
 
                 if sessione.avviso != nil, let set = sessione.setDellAvviso {
                     avvisoSetFatto(set)
+                }
+
+                if let record = recordToast {
+                    VStack {
+                        toastRecord(record)
+                        Spacer()
+                    }
+                    .allowsHitTesting(false)
+                    .transition(menoMovimento ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
 
                 if case let .countdown(dal, _, _) = sessione.fase {
@@ -196,6 +225,20 @@ struct SessioneView: View {
         }
         .sheet(isPresented: $scalettaAperta) {
             ScalettaView(sessione: sessione)
+        }
+        .confirmationDialog("Eliminare questo set?",
+                            isPresented: Binding(get: { setDaEliminare != nil },
+                                                 set: { if !$0 { setDaEliminare = nil } }),
+                            titleVisibility: .visible) {
+            Button("Elimina set", role: .destructive) {
+                if let voce = setDaEliminare {
+                    sessione.eliminaSet(esercizio: voce.esercizio, set: voce.set)
+                }
+                setDaEliminare = nil
+            }
+            Button("Annulla", role: .cancel) { setDaEliminare = nil }
+        } message: {
+            Text("Il set torna da fare.")
         }
         .sheet(item: $correzione) { correzione in
             CorreggiSetView(sessione: sessione, esercizio: correzione.esercizio, indice: correzione.set)
@@ -406,6 +449,10 @@ struct SessioneView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Correggi set")
+                        .id("piastra-\(indice)-\(posizione)")
+                        .contextMenu {
+                            menuPiastra(set, posizione: posizione, esercizio: indice)
+                        }
                         .modifier(ScorriPerTogliere(attivo: sessione.puoTogliere(esercizio: indice, set: posizione)) {
                             sessione.togliSet(esercizio: indice, set: posizione)
                         })
@@ -692,6 +739,91 @@ struct SessioneView: View {
             nota: prima.map { TimedText.before(seconds: $0.seconds, weight: sessione.pesoATempo(indice, $0.weight)) }))
     }
 
+    // MARK: Menu della piastra
+
+    /// Pressione prolungata su una piastra (C13): Correggi set; Elimina set (fatte) o Rimuovi (da fare,
+    /// con le stesse regole dello scorrimento).
+    @ViewBuilder
+    private func menuPiastra(_ set: SessionSet, posizione: Int, esercizio indice: Int) -> some View {
+        Button {
+            correzione = Correzione(esercizio: indice, set: posizione)
+        } label: {
+            Label("Correggi set", systemImage: "pencil")
+        }
+        if set.isDone {
+            Button(role: .destructive) {
+                setDaEliminare = Correzione(esercizio: indice, set: posizione)
+            } label: {
+                Label("Elimina set", systemImage: "trash")
+            }
+        } else if sessione.puoTogliere(esercizio: indice, set: posizione) {
+            Button(role: .destructive) {
+                withAnimation(.snappy) { sessione.togliSet(esercizio: indice, set: posizione) }
+            } label: {
+                Label("Rimuovi", systemImage: "trash")
+            }
+        }
+    }
+
+    // MARK: Record
+
+    /// Dopo ogni «Set fatto» (o annullamento): se un esercizio ha un record nuovo o più alto, toast per 3 s.
+    private func controllaRecord() {
+        let adesso = Dictionary(sessione.sessione.record.map { ($0.exercise, $0) }, uniquingKeysWith: { $1 })
+        let nuovo = adesso.values.first { voce in
+            guard let prima = recordNoti[voce.exercise] else { return true }
+            if voce.seconds != nil || prima.seconds != nil {
+                return (voce.seconds ?? 0) > (prima.seconds ?? 0)
+            }
+            return voce.lift.estimatedMax > prima.lift.estimatedMax + 0.001
+        }
+        recordNoti = adesso
+        guard let nuovo else { return }
+        Aptica.record.dai()
+        withAnimation(menoMovimento ? nil : .snappy) { recordToast = nuovo }
+        numeroToast += 1
+        let numero = numeroToast
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            guard numero == numeroToast else { return }
+            withAnimation(menoMovimento ? nil : .snappy) { recordToast = nil }
+        }
+    }
+
+    /// Toast del record (C9): fondo grafite, perno giallo, «Record su Panca piana» e «70 × 8».
+    private func toastRecord(_ voce: SessionSummary.Record) -> some View {
+        let valore: String
+        if let secondi = voce.seconds {
+            valore = TimedText.value(seconds: secondi, weight: voce.withWeight ? voce.lift.weight : nil)
+        } else {
+            valore = SessionText.weightReps(voce.lift.weight, voce.lift.reps)
+        }
+        return HStack(spacing: 12) {
+            Circle()
+                .fill(Color.perno)
+                .frame(width: 14, height: 14)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(voce.title)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.piastraTenue)
+                    .lineLimit(1)
+                Text(valore)
+                    .font(.piastra(26))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.piastraTesto)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.piastra, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .combine)
+    }
+
     // MARK: Dock
 
     /// Il dock è sempre lo stesso `DockSessione` (nil solo a sessione finita): così, cambiando fase, il colore
@@ -915,6 +1047,7 @@ struct SessioneView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .numeriCheRuotano(valore)
                 Text(sotto)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.inchiostroTenue)

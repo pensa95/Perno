@@ -18,6 +18,8 @@ struct PrimoAvvioView: View {
 
     @Environment(Backup.self) private var backup
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var schema
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
     private enum Passo {
         case benvenuto
@@ -56,7 +58,7 @@ struct PrimoAvvioView: View {
             case .primaScheda: primaScheda
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: passo)
+        .animation(menoMovimento ? nil : .easeInOut(duration: 0.25), value: passo)
         .background(Color.lamiera.ignoresSafeArea())
         .fileImporter(isPresented: $sceltaAperta,
                       allowedContentTypes: scelta == .copia ? [.json] : [.folder]) { risultato in
@@ -79,9 +81,10 @@ struct PrimoAvvioView: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 20) {
-                PernoMark()
-                    .frame(width: 136, height: 136)
-                    .background(Color.foglio, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+                MarchioIngresso(scuro: schema == .dark)
+                    .frame(width: MarchioIngresso.larghezza, height: MarchioIngresso.altezza)
+                    .padding(.bottom, 8)
+                    .accessibilityHidden(true)
                 Text("Perno")
                     .font(.piastra(64))
                     .foregroundStyle(Color.inchiostro)

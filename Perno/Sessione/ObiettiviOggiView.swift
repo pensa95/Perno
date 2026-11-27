@@ -113,6 +113,7 @@ struct ObiettiviOggiView: View {
                 .foregroundStyle(Color.inchiostro)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
+                .numeriCheRuotano(valore)
                 .accessibilityLabel("\(titolo) \(valore)")
             HStack(spacing: 4) {
                 tasto("minus", etichetta: meno, attivo: menoAttivo) { cambia(-1) }

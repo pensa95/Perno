@@ -28,6 +28,7 @@ struct HomeView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(Backup.self) private var backup
+    @Environment(\.apriSezione) private var apriSezione
     @State private var sessioneDaAnnullare: WorkoutSession?
     /// Letta solo per ridisegnare i kg quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
@@ -57,6 +58,21 @@ struct HomeView: View {
             if let id = sessione.routine?.id { date[id] = max(date[id] ?? .distantPast, sessione.startedAt) }
         }
         return date
+    }
+
+    /// «Inizia allenamento» dal Tasto Azione o da Siri (C12): sessione aperta → si riapre; sessione interrotta →
+    /// si riprende; scheda di oggi ancora da fare → si avvia. Se oggi è già fatto o non c'è una scheda, resta la Home.
+    private func gestisciRichiestaAvvio() {
+        guard RichiestaAvvio.shared.inAttesa else { return }
+        RichiestaAvvio.shared.inAttesa = false
+        apriSezione(.allenati)
+        if sessioneViva != nil {
+            apriSessione()
+        } else if let interrotta = sessioneInterrotta {
+            riprendi(interrotta)
+        } else if sessioneDiOggi == nil, let scheda = proposta, !scheda.entries.isEmpty {
+            avvia(scheda)
+        }
     }
 
     private var proposta: Routine? {
@@ -133,6 +149,10 @@ struct HomeView: View {
         }
         .background(Color.lamiera)
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear(perform: gestisciRichiestaAvvio)
+        .onChange(of: RichiestaAvvio.shared.inAttesa) { _, attesa in
+            if attesa { gestisciRichiestaAvvio() }
+        }
         .confirmationDialog("Annullare la sessione?",
                             isPresented: Binding(get: { sessioneDaAnnullare != nil },
                                                  set: { if !$0 { sessioneDaAnnullare = nil } }),
