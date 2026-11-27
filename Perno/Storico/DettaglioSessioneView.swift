@@ -12,7 +12,6 @@ struct DettaglioSessioneView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @State private var chiediEliminazione = false
     @State private var pdf: FileDaCondividere?
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
@@ -35,27 +34,19 @@ struct DettaglioSessioneView: View {
         }
         .background(Color.lamiera.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .confirmationDialog("Eliminare la sessione?", isPresented: $chiediEliminazione, titleVisibility: .visible) {
-            Button("Elimina sessione", role: .destructive, action: elimina)
-            Button("Annulla", role: .cancel) {}
-        } message: {
-            Text("La sessione viene eliminata con tutti i set.")
-        }
         .sheet(item: $pdf) { file in
             FoglioCondivisione(url: file.url)
                 .presentationDetents([.medium, .large])
         }
     }
 
-    /// La vista si chiude, poi la sessione si elimina (così nessuna vista legge una sessione eliminata).
+    /// Senza conferma (D6): la vista si chiude e la sessione sparisce subito; il toast «Sessione eliminata ·
+    /// Annulla» dura 5 s, poi si cancella davvero (così nessuna vista legge una sessione eliminata).
     private func elimina() {
         let registro = sessione
         let context = context
         dismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            context.delete(registro)
-            try? context.save()
-        }
+        Eliminazioni.shared.elimina(registro, in: context)
     }
 
     // MARK: Testata
@@ -68,9 +59,7 @@ struct DettaglioSessioneView: View {
                 Button(action: esportaPDF) {
                     Label("Esporta PDF", systemImage: "square.and.arrow.up")
                 }
-                Button(role: .destructive) {
-                    chiediEliminazione = true
-                } label: {
+                Button(role: .destructive, action: elimina) {
                     Label("Elimina sessione", systemImage: "trash")
                 }
             } label: {

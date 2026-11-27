@@ -47,8 +47,7 @@ struct SessioneLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 12) {
                         if stato.showsProgress, let fine = stato.timerEnd {
-                            BarraRecupero(inizio: stato.timerStart, fine: fine,
-                                          colore: colori.tintaIsola, traccia: Color.white.opacity(0.2))
+                            BarraRecupero(inizio: stato.timerStart, fine: fine, colore: colori.tintaIsola)
                         }
                         Pulsanti(stato: stato,
                                  principale: (colori.principaleIsola, colori.suPrincipaleIsola),
@@ -118,7 +117,7 @@ struct CardBloccoSchermo: View {
             }
             .padding(.top, 2)
             if stato.showsProgress, let fine = stato.timerEnd {
-                BarraRecupero(inizio: stato.timerStart, fine: fine, colore: colori.barra, traccia: colori.traccia)
+                BarraRecupero(inizio: stato.timerStart, fine: fine, colore: colori.barra)
                     .padding(.top, 10)
             }
             if stato.primary != nil {
@@ -199,11 +198,12 @@ struct RigaSet: View {
     }
 }
 
+/// Barra del tempo della card (D11): solo la `ProgressView` con la sua traccia di sistema. Il fondo a capsula
+/// che c'era sotto la faceva sembrare una barra dentro un'altra barra.
 struct BarraRecupero: View {
     let inizio: Date
     let fine: Date
     let colore: Color
-    let traccia: Color
 
     var body: some View {
         ProgressView(timerInterval: inizio...fine, countsDown: false) {
@@ -213,7 +213,6 @@ struct BarraRecupero: View {
         }
         .progressViewStyle(.linear)
         .tint(colore)
-        .background(traccia, in: Capsule())
         .accessibilityHidden(true)
     }
 }

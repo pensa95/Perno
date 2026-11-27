@@ -143,6 +143,7 @@ struct SezioniView: View {
                 .tag(Sezione.impostazioni)
         }
         .tint(Color.inchiostro)
+        .overlay(alignment: .bottom) { ToastEliminazione() }
         .overlay {
             if let passaggio, let sessione {
                 FantasmaSessione(sessione: sessione, passaggio: passaggio)
@@ -172,7 +173,11 @@ struct SezioniView: View {
                     riepilogo(registro)
                 }
         }
-        .onAppear(perform: chiudiInattive)
+        .onAppear {
+            chiudiInattive()
+            // Sessioni eliminate poco prima che l'app si chiudesse (D6): si cancellano ora.
+            Eliminazioni.shared.eseguiPendenti(in: context)
+        }
         .onChange(of: scenePhase) { _, fase in
             if fase == .active { chiudiInattive() }
         }

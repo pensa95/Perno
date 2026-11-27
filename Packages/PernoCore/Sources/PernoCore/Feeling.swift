@@ -23,8 +23,8 @@ public enum Feeling: String, CaseIterable, Codable, Sendable {
 
 /// Testi dell'avviso dopo «Set fatto» (UI v6, tavole 5, 6, 7 e 16).
 public enum NoticeText {
-    /// L'avviso resta aperto 10 s; ogni tocco li rinnova.
-    public static let duration: TimeInterval = 10
+    /// L'avviso resta aperto 15 s fissi (D2): i tocchi sui valori non rinnovano il tempo.
+    public static let duration: TimeInterval = 15
     public static let feelingQuestion = "Com'è andato?"
 
     /// «Set 1 fatto, 65 kg»; senza peso (a tempo senza «Con peso») «Set 1 fatto».

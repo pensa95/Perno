@@ -38,7 +38,8 @@ struct MarchioIngresso: View {
 
 /// Animazione d'ingresso «Dentro il perno» (C2, scelta il 27/11): parte dal fotogramma della launch
 /// screen (marchio sulla lamiera), uno zoom che accelera entra nel perno finché lo schermo è tutto
-/// giallo, poi il giallo sfuma mentre la Home entra da più vicino. 0,77 s in tutto.
+/// giallo, poi il giallo sfuma mentre la Home entra da più vicino. Prima dello zoom il marchio resta fermo
+/// 0,3 s (D1): 1,07 s in tutto.
 ///
 /// Il giallo a tutto schermo è un fotogramma di passaggio (eccezione alla regola «mai fondo giallo»,
 /// `identity-v1.md`), mai un fondo fermo.
@@ -97,12 +98,18 @@ struct IngressoView: View {
             return
         }
 
-        // Il perno deve coprire tutto lo schermo: il suo raggio arriva alla metà della diagonale.
+        // Il marchio resta fermo 0,3 s (D1, come il fotogramma della launch screen), poi lo zoom: il perno
+        // deve coprire tutto lo schermo, il suo raggio arriva alla metà della diagonale.
         let copre = hypot(schermo.width, schermo.height) / 2 / MarchioIngresso.raggioPerno * 1.05
-        withAnimation(.timingCurve(0.75, 0, 0.9, 0.25, duration: 0.44)) {
-            scalaMarchio = copre
-        } completion: {
-            esci()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            // Curva che parte subito (D1): con quella di prima, lenta all'inizio, per i primi fotogrammi
+            // restava sullo schermo il marchio piccolo, come se lo zoom non fosse partito.
+            withAnimation(.timingCurve(0.5, 0, 0.85, 0.3, duration: 0.44)) {
+                scalaMarchio = copre
+            } completion: {
+                esci()
+            }
         }
     }
 

@@ -24,12 +24,13 @@ struct HomeView: View {
 
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
     @Query private var giorni: [PlanDay]
-    @Query(sort: \WorkoutSession.startedAt) private var sessioni: [WorkoutSession]
+    @Query(sort: \WorkoutSession.startedAt) private var tutteLeSessioni: [WorkoutSession]
+    /// Senza quelle appena eliminate, in attesa dei 5 s di «Annulla» (D6).
+    private var sessioni: [WorkoutSession] { Eliminazioni.shared.visibili(tutteLeSessioni) }
 
     @Environment(\.modelContext) private var context
     @Environment(Backup.self) private var backup
     @Environment(\.apriSezione) private var apriSezione
-    @State private var sessioneDaAnnullare: WorkoutSession?
     /// Letta solo per ridisegnare i kg quando cambia l'unità.
     @AppStorage(Impostazioni.unita) private var unita: WeightUnit = .kilograms
 
@@ -152,27 +153,6 @@ struct HomeView: View {
         .onAppear(perform: gestisciRichiestaAvvio)
         .onChange(of: RichiestaAvvio.shared.inAttesa) { _, attesa in
             if attesa { gestisciRichiestaAvvio() }
-        }
-        .confirmationDialog("Annullare la sessione?",
-                            isPresented: Binding(get: { sessioneDaAnnullare != nil },
-                                                 set: { if !$0 { sessioneDaAnnullare = nil } }),
-                            titleVisibility: .visible,
-                            presenting: sessioneDaAnnullare) { sessione in
-            Button("Annulla sessione", role: .destructive) { annulla(sessione) }
-            Button("Mantieni", role: .cancel) {}
-        } message: { _ in
-            Text("La sessione viene eliminata con tutti i set e oggi torna da fare.")
-        }
-    }
-
-    /// «Annulla sessione» sulla card di oggi fatto: elimina la sessione (set e pause compresi).
-    /// Il dialogo si chiude prima, poi la sessione si elimina (così nessuna vista legge una
-    /// sessione già eliminata, come per il riepilogo e il dettaglio).
-    private func annulla(_ sessione: WorkoutSession) {
-        sessioneDaAnnullare = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            context.delete(sessione)
-            try? context.save()
         }
     }
 
@@ -407,16 +387,6 @@ struct HomeView: View {
                 numero(HomeText.volume(Units.unit.fromKilograms(sessione.chiliSollevati)), "\(Units.unit.symbol) sollevati")
             }
             PulsanteSecondario(titolo: "Vedi nello storico") { apriStorico(sessione) }
-            Button {
-                sessioneDaAnnullare = sessione
-            } label: {
-                Text("Annulla sessione")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.errore)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, -8)
         }
         .padding(.top, 20)
         .padding(.horizontal, 16)

@@ -79,6 +79,21 @@ jobs:
             test -f "$EXT/$f" || { echo "Manca $f nell'estensione"; exit 1; }
           done
 
+      - name: Verifica le varianti dell'icona (D9)
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Perno.app
+          plutil -p "$APP/Info.plist" | grep -i "icon" || true
+          xcrun assetutil --info "$APP/Assets.car" > icone.json
+          # Le tre varianti (chiara, scura, tinta) devono essere nel catalogo compilato.
+          python3 - <<'PY'
+          import json
+          voci = [v for v in json.load(open("icone.json")) if v.get("Name") == "AppIcon"]
+          aspetti = sorted({str(v.get("Appearance", "any")) for v in voci})
+          print("Varianti di AppIcon in Assets.car:", aspetti)
+          if len(aspetti) < 3:
+              print("::warning::AppIcon in Assets.car ha meno di tre varianti (chiara, scura, tinta): vedi D9 in lavori.md")
+          PY
+
       - name: Crea Perno.ipa
         run: |
           mkdir -p Payload

@@ -24,7 +24,7 @@ final class SessioneInCorso: Identifiable {
     private(set) var recuperoAbituale: TimeInterval? = nil
     /// Avviso dopo «Set fatto» (ripetizioni, riserva, Annulla); `nil` quando è chiuso.
     private(set) var avviso: Avviso? = nil
-    /// Secondi in cui l'avviso resta aperto (10 dalla UI v6); ogni tocco li rinnova.
+    /// Secondi in cui l'avviso resta aperto (15, D2): la scadenza è fissa, i tocchi non la spostano.
     static let durataAvviso: TimeInterval = NoticeText.duration
 
     /// Recupero in cronometro o alla rovescia dell'esercizio di adesso (UI v6, T14): scelto nell'esercizio
@@ -359,9 +359,20 @@ final class SessioneInCorso: Identifiable {
         rinnovaAvviso(ora)
     }
 
-    /// Tocco sull'avviso fuori dai pulsanti: rinnova i 10 secondi.
-    func toccaAvviso(alle ora: Date = .now) {
-        rinnovaAvviso(ora)
+    /// Faccina dopo, su un set di lavoro già chiuso (D3): scelta rapida dalla piastra, senza il foglio intero.
+    func impostaFaccina(_ faccina: Feeling?, esercizio: Int, set indice: Int, alle ora: Date = .now) {
+        guard let registrato = set[safe: esercizio]?[safe: indice],
+              registrato.isDone, registrato.kind != .approach else { return }
+        registrato.feeling = faccina
+        sessione.lastActivityAt = ora
+        try? context.save()
+    }
+
+    /// Tocco fuori dall'avviso (D2): conferma i valori mostrati (già scritti a ogni −/+ o faccina) e chiude.
+    func confermaAvviso(alle ora: Date = .now) {
+        sessione.lastActivityAt = ora
+        try? context.save()
+        chiudiAvviso()
     }
 
     /// «Annulla»: il set torna in corso, con il cronometro di prima.
@@ -389,7 +400,7 @@ final class SessioneInCorso: Identifiable {
         try? context.save()
     }
 
-    /// Fine dei 5 s senza tocchi. Dopo l'ultimo set della sessione si apre il riepilogo, con la
+    /// Fine dei 15 s. Dopo l'ultimo set della sessione si apre il riepilogo, con la
     /// durata che finisce all'ultimo set.
     func chiudiAvviso() {
         avviso = nil
@@ -398,8 +409,8 @@ final class SessioneInCorso: Identifiable {
         }
     }
 
+    /// Un tocco sui valori dell'avviso segna l'attività ma non sposta la scadenza (D2).
     private func rinnovaAvviso(_ ora: Date) {
-        avviso?.scadenza = ora.addingTimeInterval(Self.durataAvviso)
         sessione.lastActivityAt = ora
         try? context.save()
     }
@@ -819,6 +830,8 @@ final class SessioneInCorso: Identifiable {
     }
 
     private func esegui(_ ora: Date, _ azione: (inout SessionMachine) throws -> Void) {
+        // Un'azione dal dock conferma i valori dell'avviso e lo chiude (D2).
+        avviso = nil
         let ordinePrima = macchina.order
         do {
             try azione(&macchina)

@@ -13,7 +13,9 @@ struct StoricoView: View {
         case esercizi
     }
 
-    @Query(sort: \WorkoutSession.startedAt, order: .reverse) private var sessioni: [WorkoutSession]
+    @Query(sort: \WorkoutSession.startedAt, order: .reverse) private var tutteLeSessioni: [WorkoutSession]
+    /// Senza quelle appena eliminate, in attesa dei 5 s di «Annulla» (D6).
+    private var sessioni: [WorkoutSession] { Eliminazioni.shared.visibili(tutteLeSessioni) }
     @Query(sort: \Routine.createdAt) private var schede: [Routine]
     @State private var ricerca = ""
     /// Letta solo per ridisegnare i pesi quando cambia l'unità.
