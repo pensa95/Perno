@@ -93,7 +93,8 @@ struct SessioneView: View {
                                 if case .warmUp = sessione.fase {
                                     riscaldamento
                                 } else if sessione.daScegliere {
-                                    SceltaEsercizio(sessione: sessione) { aggiungiAperto = true }
+                                    SceltaEsercizio(sessione: sessione, scegli: { aggiungiAperto = true },
+                                                    scaletta: { scalettaAperta = true })
                                 } else {
                                     esercizio
                                 }
@@ -331,28 +332,38 @@ struct SessioneView: View {
 
     // MARK: Testata
 
+    /// D5 (variante B): freccia giù a sinistra; al centro il nome della scheda e sotto il tempo totale grande;
+    /// a destra «Concludi» come pulsante testo neutro (il rosso resta per le azioni distruttive). La Scaletta è
+    /// nella riga dell'esercizio. Il tondo pausa accanto al tempo arriva con F1.
     private func testata(ora: Date) -> some View {
         HStack(spacing: 4) {
             PulsanteTondo(icona: "chevron.down", etichetta: "Riduci la sessione", azione: riduci)
             VStack(spacing: 0) {
                 Text(sessione.sessione.titolo)
-                    .font(.footnote.weight(.medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.inchiostroTenue)
                     .lineLimit(1)
                 Text(SessionText.clock(ora.timeIntervalSince(sessione.sessione.startedAt)))
-                    .font(.piastra(22))
+                    .font(.piastra(30))
                     .monospacedDigit()
                     .foregroundStyle(Color.inchiostro)
             }
             .frame(maxWidth: .infinity)
-            PulsanteTondo(icona: "list.bullet", etichetta: "Scaletta") {
-                scalettaAperta = true
-            }
             Button("Concludi") { sessione.apriRiepilogo() }
-                .font(.body.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.inchiostro)
-                .frame(width: 76, height: 44, alignment: .trailing)
+                .padding(.horizontal, 14)
+                .frame(minWidth: 44, minHeight: 36)
+                .background(Color.piastraFatta, in: Capsule())
                 .buttonStyle(.plain)
+                .frame(minWidth: 76, minHeight: 44, alignment: .trailing)
+        }
+    }
+
+    /// Tondo Scaletta (38 pt) nella riga del nome dell'esercizio, accanto al menu «…».
+    private var tondoScaletta: some View {
+        PulsanteTondo(icona: "list.bullet", etichetta: "Scaletta", dimensione: 38) {
+            scalettaAperta = true
         }
     }
 
@@ -362,9 +373,13 @@ struct SessioneView: View {
     /// sottotitolo «A seguire:» sopra l'elenco degli esercizi.
     private var riscaldamento: some View {
         VStack(alignment: .leading, spacing: 0) {
-            titoloEsercizio("Riscaldamento",
-                            sottotitolo: sessione.ordineDiOggi.isEmpty ? nil : "A seguire:")
-                .padding(.top, 24)
+            HStack(alignment: .top, spacing: 8) {
+                titoloEsercizio("Riscaldamento",
+                                sottotitolo: sessione.ordineDiOggi.isEmpty ? nil : "A seguire:")
+                Spacer(minLength: 0)
+                tondoScaletta
+            }
+            .padding(.top, 24)
 
             if !sessione.ordineDiOggi.isEmpty {
                 Pila {
@@ -429,7 +444,10 @@ struct SessioneView: View {
                                                  count: sessione.esercizi.count,
                                                  repsMin: esercizio.repsMin, repsMax: esercizio.repsMax))
                 Spacer(minLength: 0)
-                menuEsercizio(esercizio)
+                HStack(spacing: 8) {
+                    tondoScaletta
+                    menuEsercizio(esercizio)
+                }
             }
             .padding(.top, 24)
 
@@ -443,10 +461,6 @@ struct SessioneView: View {
             VStack(spacing: 4) {
                 ForEach(Array(sessione.set[indice].enumerated()), id: \.offset) { posizione, set in
                     Group {
-                        if posizione == sessione.macchina.setIndex,
-                           indice == sessione.macchina.currentExerciseIndex {
-                            recuperoPrima(esercizio: esercizio)
-                        }
                         Button {
                             // Dopo uno scorrimento laterale il tocco non apre il dettaglio.
                             guard !ScorriAperte.shared.tocchiBloccati else { return }
@@ -479,8 +493,10 @@ struct SessioneView: View {
                         .modifier(ScorriPerTogliere(attivo: sessione.puoTogliere(esercizio: indice, set: posizione)) {
                             sessione.togliSet(esercizio: indice, set: posizione)
                         })
-                        if let riposo = riposi[safe: posizione] ?? nil {
-                            RigaRecupero(testo: PlateText.restDone(riposo))
+                        // D12: tra ogni set dell'esercizio una riga di recupero; dopo l'ultimo set nessuna.
+                        if posizione < sessione.set[indice].count - 1 {
+                            rigaRecupero(esercizio: esercizio, indice: indice, dopo: posizione,
+                                         misurato: riposi[safe: posizione] ?? nil)
                         }
                     }
                 }
@@ -525,23 +541,31 @@ struct SessioneView: View {
         return ((sessione.macchina.currentExerciseIndex ?? -1) * 1000 + sessione.macchina.setIndex) * 10 + fase
     }
 
-    /// Prima del set di adesso: durante il recupero la piastrina blu con il tempo del dock; durante il 3-2-1
-    /// che parte dal recupero la riga del recupero appena finito (il tempo si registra alla fine del 3-2-1).
+    /// Riga tra il set `dopo` e il successivo (D12). Recupero in corso: riga alta in blu con il tempo del dock e
+    /// il perno; 3-2-1 partito dal recupero: il recupero appena finito (si registra alla fine del 3-2-1);
+    /// recupero misurato: «recupero 2:12»; altrimenti la riga tenue «recupero».
     @ViewBuilder
-    private func recuperoPrima(esercizio: SessionExercise) -> some View {
+    private func rigaRecupero(esercizio: SessionExercise, indice: Int, dopo posizione: Int,
+                              misurato: TimeInterval?) -> some View {
+        let seguente = posizione + 1 == sessione.macchina.setIndex
+            && indice == sessione.macchina.currentExerciseIndex
         switch sessione.fase {
-        case let .rest(dal):
+        case let .rest(dal) where seguente:
             TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
-                PiastrinaRecupero(
+                RigaRecuperoInCorso(
                     tempo: RestTimer.display(mode: sessione.modoRecupero,
                                              elapsed: contesto.date.timeIntervalSince(dal),
                                              duration: sessione.durataRecupero),
                     nota: PlateText.restNote(fixed: esercizio.fixedRest, usual: sessione.recuperoAbituale))
             }
-        case let .countdown(dal, inizioPausa, tipo) where tipo == .rest:
+        case let .countdown(dal, inizioPausa, tipo) where seguente && tipo == .rest:
             RigaRecupero(testo: PlateText.restDone(dal.timeIntervalSince(inizioPausa)))
         default:
-            EmptyView()
+            if let misurato {
+                RigaRecupero(testo: PlateText.restDone(misurato))
+            } else {
+                RigaRecupero(testo: "recupero", previsto: true)
+            }
         }
     }
 
@@ -590,7 +614,7 @@ struct SessioneView: View {
             Image(systemName: "ellipsis")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.inchiostro)
-                .frame(width: 44, height: 44)
+                .frame(width: 38, height: 38)
                 .background(Color.foglio, in: Circle())
         }
         .accessibilityLabel("Altre azioni")
@@ -712,9 +736,8 @@ struct SessioneView: View {
         let obiettivo = SessionText.weightReps(set.targetWeight, set.targetReps)
         let diAdesso = posizione == sessione.macchina.setIndex && indice == sessione.macchina.currentExerciseIndex
         guard diAdesso, !inRecupero else {
-            let prossimo = diAdesso
             return PiastraSet(nome: nome, valore: obiettivo, stato: .daFare, calda: calda,
-                              notaDaFare: prossimo ? PlateText.next : "obiettivo")
+                              notaDaFare: diAdesso ? PlateText.next : "obiettivo")
         }
 
         let inCorso: Bool = {
@@ -723,13 +746,11 @@ struct SessioneView: View {
         }()
         if calda {
             return PiastraSet(nome: nome, valore: obiettivo, stato: .adesso(
-                etichetta: inCorso ? "\(nome), in corso" : "\(nome), avvicinamento",
-                evidenza: nil, nota: nil), calda: true)
+                inCorso: inCorso, evidenza: nil, nota: nil), calda: true)
         }
         let differenza = prima.flatMap { SessionText.delta(today: set.targetWeight, before: $0.weight) }
         return PiastraSet(nome: nome, valore: obiettivo, stato: .adesso(
-            etichetta: inCorso ? "\(nome), in corso" : "\(nome), obiettivo",
-            evidenza: differenza, nota: notaPrima))
+            inCorso: inCorso, evidenza: differenza, nota: notaPrima))
     }
 
     /// Piastra di un set a tempo (UI v5): «10 × 0:45» con il peso, «0:45» senza.
@@ -748,9 +769,8 @@ struct SessioneView: View {
         let valore = TimedText.value(seconds: obiettivo, weight: sessione.pesoATempo(indice, set.targetWeight))
         let diAdesso = posizione == sessione.macchina.setIndex && indice == sessione.macchina.currentExerciseIndex
         guard diAdesso, !inRecupero else {
-            let prossimo = diAdesso
             return PiastraSet(nome: nome, valore: valore, stato: .daFare,
-                              notaDaFare: prossimo ? PlateText.next : "obiettivo")
+                              notaDaFare: diAdesso ? PlateText.next : "obiettivo")
         }
         let inCorso: Bool = {
             if case .inSet = sessione.fase { return true }
@@ -759,7 +779,7 @@ struct SessioneView: View {
         // «+5 s» e «prima 10 × 0:40» rispetto allo stesso set della volta prima.
         let prima = set.kind == .approach ? nil : sessione.primaATempo[indice][safe: numeri[posizione] - 1]
         return PiastraSet(nome: nome, valore: valore, stato: .adesso(
-            etichetta: inCorso ? "\(nome), in corso" : "\(nome), obiettivo",
+            inCorso: inCorso,
             evidenza: prima.flatMap { TimedText.delta(today: obiettivo, before: $0.seconds) },
             nota: prima.map { TimedText.before(seconds: $0.seconds, weight: sessione.pesoATempo(indice, $0.weight)) }))
     }

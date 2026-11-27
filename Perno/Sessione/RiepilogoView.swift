@@ -20,9 +20,9 @@ struct RiepilogoView: View {
     @State private var chiediEliminazione = false
     @State private var notaAperta = false
     @FocusState private var notaAttiva: Bool
-    /// Numeri che salgono contando da 0 a 1 (C10) e record che compaiono uno dopo l'altro.
+    /// Riepilogo in sequenza (D7, `SummarySequence`): durata, set, kg e poi i record, ognuno quando finisce il
+    /// precedente. Il progresso va da 0 al numero dei passi; un tocco lo porta subito alla fine.
     @State private var progresso: Double = 0
-    @State private var recordVisibili = false
     @Environment(\.accessibilityReduceMotion) private var menoMovimento
 
     var body: some View {
@@ -44,6 +44,7 @@ struct RiepilogoView: View {
                 .padding(.bottom, 16)
             }
             .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { salta() })
             PulsanteGiallo(titolo: "Salva sessione", azione: salva)
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
@@ -59,13 +60,23 @@ struct RiepilogoView: View {
         .onAppear {
             notaAperta = !sessione.note.isEmpty
             if menoMovimento {
-                progresso = 1
-                recordVisibili = true
+                progresso = Double(passi)
             } else {
-                withAnimation(.easeOut(duration: 0.8)) { progresso = 1 }
-                recordVisibili = true
+                withAnimation(.linear(duration: SummarySequence.duration(records: sessione.record.count))) {
+                    progresso = Double(passi)
+                }
             }
         }
+    }
+
+    private var passi: Int { SummarySequence.steps(records: sessione.record.count) }
+
+    /// Un tocco salta alla fine della sequenza.
+    private func salta() {
+        guard progresso < Double(passi) else { return }
+        var transazione = Transaction(animation: nil)
+        transazione.disablesAnimations = true
+        withTransaction(transazione) { progresso = Double(passi) }
     }
 
     // MARK: Testata
@@ -152,6 +163,7 @@ struct RiepilogoView: View {
         let nonFatti: [(esercizio: SessionExercise, conto: Int)] = completa == nil ? [] : sessione.setNonFatti
         let record = sessione.record
         if !nonFatti.isEmpty || !record.isEmpty {
+            SequenzaRecord(progresso: progresso) { avanzamento in
             Pila {
                 ForEach(Array(nonFatti.enumerated()), id: \.offset) { _, voce in
                     HStack(spacing: 12) {
@@ -190,11 +202,12 @@ struct RiepilogoView: View {
                     }
                     .vocePila()
                     .accessibilityElement(children: .combine)
-                    .opacity(recordVisibili ? 1 : 0)
-                    .offset(y: recordVisibili ? 0 : 8)
-                    .animation(menoMovimento ? nil : .easeOut(duration: 0.3).delay(0.8 + 0.2 * Double(indice)),
-                               value: recordVisibili)
+                    .opacity(SummarySequence.fraction(progress: avanzamento,
+                                                      step: SummarySequence.numberSteps + indice))
+                    .offset(y: 8 * (1 - SummarySequence.fraction(progress: avanzamento,
+                                                                 step: SummarySequence.numberSteps + indice)))
                 }
+            }
             }
             .padding(.top, 28)
         }
@@ -246,8 +259,8 @@ struct RiepilogoView: View {
     }
 }
 
-/// Durata, set e kg che salgono contando fino al valore (C10): `progresso` va da 0 a 1 con un'animazione e la
-/// vista si ridisegna a ogni fotogramma. A 1 i valori sono quelli veri.
+/// Durata, set e kg che salgono contando uno dopo l'altro (C10, D7): `progresso` avanza con un'animazione e la
+/// vista si ridisegna a ogni fotogramma. A fine sequenza i valori sono quelli veri.
 private struct NumeriRiepilogo: View, Animatable {
     var progresso: Double
     let secondi: Double
@@ -262,12 +275,34 @@ private struct NumeriRiepilogo: View, Animatable {
     }
 
     var body: some View {
+        let durata = SummarySequence.fraction(progress: progresso, step: 0)
+        let set = SummarySequence.fraction(progress: progresso, step: 1)
+        let chiliFatti = SummarySequence.fraction(progress: progresso, step: 2)
         HStack(alignment: .top, spacing: 12) {
-            NumeroGrande(valore: HomeText.duration(secondi * progresso), etichetta: "durata")
-            NumeroGrande(valore: "\(Int((Double(setFatti) * progresso).rounded()))/\(setPrevisti)", etichetta: "set")
-            NumeroGrande(valore: HomeText.volume(Units.unit.fromKilograms(chili * progresso)),
+            NumeroGrande(valore: HomeText.duration(secondi * durata), etichetta: "durata")
+            NumeroGrande(valore: "\(Int((Double(setFatti) * set).rounded()))/\(setPrevisti)", etichetta: "set")
+            NumeroGrande(valore: HomeText.volume(Units.unit.fromKilograms(chili * chiliFatti)),
                          etichetta: Units.unit.symbol,
                          variazione: variazione)
         }
     }
+}
+
+/// Contenitore dei record: si ridisegna a ogni fotogramma della sequenza, così ogni record compare quando
+/// finisce il passo prima (D7).
+private struct SequenzaRecord<Contenuto: View>: View, Animatable {
+    var progresso: Double
+    let contenuto: (Double) -> Contenuto
+
+    init(progresso: Double, @ViewBuilder contenuto: @escaping (Double) -> Contenuto) {
+        self.progresso = progresso
+        self.contenuto = contenuto
+    }
+
+    var animatableData: Double {
+        get { progresso }
+        set { progresso = newValue }
+    }
+
+    var body: some View { contenuto(progresso) }
 }

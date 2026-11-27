@@ -61,12 +61,14 @@ struct LibreriaView: View {
                                             scegli(esercizio)
                                             dismiss()
                                         } label: {
-                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio),
+                                                     gruppo: esercizio.muscleGroup)
                                         }
                                         .buttonStyle(.plain)
                                     } else {
                                         NavigationLink(value: RottaStorico.esercizio(esercizio.id, indietro: "Libreria")) {
-                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio))
+                                            VocePila(titolo: esercizio.name, sottotitolo: sottotitolo(esercizio),
+                                                     gruppo: esercizio.muscleGroup)
                                         }
                                         .buttonStyle(.plain)
                                     }

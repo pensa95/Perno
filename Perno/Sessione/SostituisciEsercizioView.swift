@@ -135,6 +135,7 @@ struct SostituisciEsercizioView: View {
             scegli(voce)
         } label: {
             HStack(spacing: 12) {
+                IconaGruppo(gruppo: voce.muscleGroup, dimensione: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(voce.name)
                         .font(.body.weight(.semibold))

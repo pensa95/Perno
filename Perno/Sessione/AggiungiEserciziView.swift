@@ -123,6 +123,7 @@ struct AggiungiEserciziView: View {
                             .frame(width: 26, height: 26)
                     }
                 }
+                IconaGruppo(gruppo: esercizio.muscleGroup, dimensione: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(esercizio.name)
                         .font(.body.weight(.semibold))
