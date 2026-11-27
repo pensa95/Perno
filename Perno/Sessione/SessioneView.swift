@@ -17,6 +17,8 @@ struct SessioneView: View {
     @State private var correzione: Correzione?
     /// Set fatto da eliminare dal menu della piastra (con conferma, come in Correggi set).
     @State private var setDaEliminare: Correzione?
+    /// Set fatto di lavoro di cui si sceglie la faccina dal posto sulla piastra (D3).
+    @State private var faccinaDaScegliere: Correzione?
     /// Record battuto con l'ultimo «Set fatto»: toast in alto per 3 s (C9).
     @State private var recordToast: SessionSummary.Record?
     /// Ultimo record noto di ogni esercizio, per accorgersi di uno nuovo.
@@ -118,6 +120,8 @@ struct SessioneView: View {
                             }
                         }
                     }
+                    .modifier(SfocaDietroAvviso(attivo: sessione.avviso != nil,
+                                                conferma: { sessione.confermaAvviso() }))
                     TimelineView(.periodic(from: .now, by: 0.5)) { contesto in
                         dock(ora: contesto.date)
                     }
@@ -214,6 +218,9 @@ struct SessioneView: View {
             }
             guard !Task.isCancelled, sessione.avviso?.scadenza == scadenza else { return }
             sessione.chiudiAvviso()
+        }
+        .sheet(item: $faccinaDaScegliere) { voce in
+            sceltaRapidaFaccina(voce)
         }
         .sheet(isPresented: $aggiungiAperto) {
             AggiungiEserciziView(sessione: sessione)
@@ -449,6 +456,22 @@ struct SessioneView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Correggi set")
+                        .overlay(alignment: .trailing) {
+                            // D3: il tocco sulla faccina (o sul suo posto vuoto) di un set di lavoro fatto apre
+                            // la scelta rapida; il resto della piastra apre Correggi set.
+                            if puoCambiareFaccina(set) {
+                                Color.clear
+                                    .frame(width: 56, height: 44)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        guard !ScorriAperte.shared.tocchiBloccati else { return }
+                                        faccinaDaScegliere = Correzione(esercizio: indice, set: posizione)
+                                    }
+                                    .accessibilityElement()
+                                    .accessibilityLabel("Com'è andato?")
+                                    .accessibilityAddTraits(.isButton)
+                            }
+                        }
                         .id("piastra-\(indice)-\(posizione)")
                         .contextMenu {
                             menuPiastra(set, posizione: posizione, esercizio: indice)
@@ -682,7 +705,8 @@ struct SessioneView: View {
             return PiastraSet(nome: nome, valore: SessionText.weightReps(peso, ripetizioni),
                               stato: .fatta(nota: nil), calda: calda,
                               badge: calda ? nil : PlateText.overTarget(done: ripetizioni, target: set.targetReps),
-                              faccina: calda ? nil : set.feeling)
+                              faccina: calda ? nil : set.feeling,
+                              faccinaVuota: puoCambiareFaccina(set) && set.feeling == nil)
         }
 
         let obiettivo = SessionText.weightReps(set.targetWeight, set.targetReps)
@@ -718,7 +742,8 @@ struct SessioneView: View {
             return PiastraSet(nome: nome,
                               valore: TimedText.value(seconds: fatti, weight: sessione.pesoATempo(indice, set.weight ?? set.targetWeight)),
                               stato: .fatta(nota: TimedText.doneNote(seconds: fatti, target: obiettivo)),
-                              faccina: set.feeling)
+                              faccina: set.feeling,
+                              faccinaVuota: puoCambiareFaccina(set) && set.feeling == nil)
         }
         let valore = TimedText.value(seconds: obiettivo, weight: sessione.pesoATempo(indice, set.targetWeight))
         let diAdesso = posizione == sessione.macchina.setIndex && indice == sessione.macchina.currentExerciseIndex
@@ -737,6 +762,39 @@ struct SessioneView: View {
             etichetta: inCorso ? "\(nome), in corso" : "\(nome), obiettivo",
             evidenza: prima.flatMap { TimedText.delta(today: obiettivo, before: $0.seconds) },
             nota: prima.map { TimedText.before(seconds: $0.seconds, weight: sessione.pesoATempo(indice, $0.weight)) }))
+    }
+
+    // MARK: Faccina dopo (D3)
+
+    /// Set di lavoro fatto, con «Com'è andato?» acceso: la faccina si cambia anche dopo.
+    private func puoCambiareFaccina(_ set: SessionSet) -> Bool {
+        chiediFaccina && set.isDone && set.kind != .approach
+    }
+
+    /// Scelta rapida delle tre faccine, in un foglio basso; un secondo tocco sulla scelta o «Nessuna» la toglie.
+    private func sceltaRapidaFaccina(_ voce: Correzione) -> some View {
+        let attuale = sessione.set[safe: voce.esercizio]?[safe: voce.set]?.feeling
+        return VStack(spacing: 12) {
+            SceltaFaccina(scelta: attuale) { faccina in
+                sessione.impostaFaccina(faccina == attuale ? nil : faccina, esercizio: voce.esercizio, set: voce.set)
+                faccinaDaScegliere = nil
+            }
+            if attuale != nil {
+                Button("Nessuna") {
+                    sessione.impostaFaccina(nil, esercizio: voce.esercizio, set: voce.set)
+                    faccinaDaScegliere = nil
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.inchiostroTenue)
+                .frame(minHeight: 44)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 24)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.foglio.ignoresSafeArea())
+        .presentationDetents([.height(attuale == nil ? 190 : 240)])
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: Menu della piastra
@@ -900,7 +958,8 @@ struct SessioneView: View {
                 },
                 bordoSopra: true,
                 notaTempo: TimedText.of(seconds: obiettivo),
-                avanzamento: TimedText.progress(elapsed: trascorsi, target: obiettivo))
+                avanzamento: TimedText.progress(elapsed: trascorsi, target: obiettivo),
+                avanzamentoFluido: (dal, obiettivo))
         case let .inSet(dal):
             return DockSessione(
                 sfondo: .foglio, coloreEtichetta: .inchiostroTenue, coloreTesto: .inchiostro,
@@ -955,7 +1014,7 @@ struct SessioneView: View {
     /// Avviso dopo «Set fatto» (UI v6, tavole 5, 6, 7 e 16): tre righe che non escono mai dai bordi e non
     /// scorrono in orizzontale. «Set N fatto, 65 kg» con «Annulla»; ripetizioni (o durata) grandi al centro con
     /// − e + da 64 e lo scarto sull'obiettivo sotto; «Com'è andato?» con le faccine (solo set di lavoro, se
-    /// l'impostazione è accesa). In fondo la barretta del tempo rimasto: 10 s, ogni tocco li rinnova.
+    /// l'impostazione è accesa). In fondo la barretta del tempo rimasto: 15 s fissi, i tocchi non li rinnovano. Dietro, il contenuto è sfocato e un tocco fuori dall'avviso conferma e chiude (D2).
     private func avvisoSetFatto(_ set: SessionSet) -> some View {
         let indice = sessione.avviso?.esercizio ?? 0
         let numeri = SessionText.numbers(sessione.set[indice].map(\.kind))
@@ -1030,8 +1089,9 @@ struct SessioneView: View {
                 .padding(.top, 2)
             }
         }
+        // Il tocco sull'avviso (fuori dai pulsanti) non arriva al livello sotto, che lo conferma e lo chiude.
         .contentShape(Rectangle())
-        .onTapGesture { sessione.toccaAvviso() }
+        .onTapGesture { }
         .modifier(StileAvviso(schema: schema, inFondo: sessione.fase == .finished))
     }
 
@@ -1113,6 +1173,30 @@ struct SessioneView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(UIColor(hex: 0x14181B)).opacity(0.72).ignoresSafeArea())
+    }
+}
+
+/// Con l'avviso aperto il contenuto della sessione (sopra il dock) è sfocato e non risponde ai tocchi (D2);
+/// un tocco lì conferma i valori e chiude l'avviso. Con «Riduci trasparenza» la sfocatura diventa un velo opaco.
+private struct SfocaDietroAvviso: ViewModifier {
+    let attivo: Bool
+    let conferma: () -> Void
+    @Environment(\.accessibilityReduceTransparency) private var menoTrasparenza
+    @Environment(\.accessibilityReduceMotion) private var menoMovimento
+
+    func body(content: Content) -> some View {
+        content
+            .blur(radius: attivo && !menoTrasparenza ? 8 : 0)
+            .allowsHitTesting(!attivo)
+            .overlay {
+                if attivo {
+                    Color.lamiera.opacity(menoTrasparenza ? 0.96 : 0.0001)
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: conferma)
+                        .accessibilityHidden(true)
+                }
+            }
+            .animation(menoMovimento ? nil : .easeInOut(duration: 0.2), value: attivo)
     }
 }
 

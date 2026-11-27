@@ -51,6 +51,8 @@ struct PiastraSet: View {
     var badge: String? = nil
     /// Piastra fatta: faccina piccola a destra (UI v6).
     var faccina: Feeling? = nil
+    /// Piastra di lavoro fatta senza faccina: un posto vuoto tratteggiato dice che si può scegliere (D3).
+    var faccinaVuota = false
     /// Nota della piastra da fare: «obiettivo», o «prossimo» durante il recupero.
     var notaDaFare = "obiettivo"
     @Environment(\.spazioPerno) private var spazioPerno
@@ -154,6 +156,12 @@ struct PiastraSet: View {
             HStack(spacing: 8) {
                 if fatta, let faccina {
                     Faccina(tipo: faccina, dimensione: 20, colore: .inchiostroTenue)
+                } else if fatta, faccinaVuota {
+                    Circle()
+                        .strokeBorder(Color.inchiostroTenue.opacity(0.45),
+                                      style: StrokeStyle(lineWidth: 1.5, dash: [2.5, 3]))
+                        .frame(width: 20, height: 20)
+                        .accessibilityHidden(true)
                 }
                 if let nota {
                     Text(nota)
@@ -274,6 +282,9 @@ struct DockSessione: View {
     /// Set a tempo (UI v5): «di 0:45» a destra del tempo e barra di avanzamento (0…1) sotto.
     var notaTempo: String? = nil
     var avanzamento: Double? = nil
+    /// Set a tempo: inizio e durata in secondi. La barra scorre fluida (a ogni fotogramma, D10) dal tempo
+    /// trascorso, invece di avanzare a ogni aggiornamento del dock. Ha la precedenza su `avanzamento`.
+    var avanzamentoFluido: (dal: Date, secondi: Int)? = nil
     /// Riga sotto il tempo (UI v6, tavola 6): «Poi Lat machine, 3 set da 8 a 12».
     var sottotitolo: String? = nil
 
@@ -345,7 +356,13 @@ struct DockSessione: View {
                     .padding(.bottom, 4)
                 }
             }
-            if let avanzamento {
+            if let fluido = avanzamentoFluido {
+                TimelineView(.animation) { contesto in
+                    BarraAvanzamento(valore: TimedText.progress(elapsed: contesto.date.timeIntervalSince(fluido.dal),
+                                                                target: fluido.secondi),
+                                     colore: coloreTesto)
+                }
+            } else if let avanzamento {
                 BarraAvanzamento(valore: avanzamento, colore: coloreTesto)
             }
             }
